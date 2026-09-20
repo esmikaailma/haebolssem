@@ -17,6 +17,9 @@ let state={
 function row(label,val){return '<div class="row"><span>'+label+'</span><strong>'+val+'</strong></div>'}
 function shell(body){return '<main class="app-shell"><div class="topbar"><button class="link-btn brand" data-go="home">해볼셈</button><button class="link-btn" data-go="saved">저장 내역</button></div>'+body+'</main>'}
 function metric(label,val,note){return '<div class="metric"><div class="label">'+label+'</div><div class="value">'+val+'</div>'+(note?'<div class="note">'+note+'</div>':'')+'</div>'}
+function unknownLabels(h,keys){return keys.filter(([k])=>h[k]?.status==="unknown").map(([,label])=>label)}
+function knownFormulaParts(h,keys){return keys.map(([k,label])=>[label,costDisplay(h[k])])}
+function calcLine(label,formula,result,note=""){return '<div class="calc-line"><div class="calc-line-title">'+label+'</div><div class="calc-formula">'+formula+'</div><strong>'+result+'</strong>'+(note?'<div class="helper">'+note+'</div>':'')+'</div>'}
 function exportConditionImage(item){
   const r=item.results;
   const canvas=document.createElement("canvas");
@@ -37,15 +40,17 @@ function exportConditionImage(item){
   let y=350;
   lines.forEach(([label,value])=>{
     ctx.fillStyle="#6b7280";ctx.font="600 25px Pretendard, sans-serif";ctx.fillText(label,112,y);
-    ctx.fillStyle="#111827";ctx.font="800 38px Pretendard, sans-serif";ctx.textAlign="right";ctx.fillText(value,968,y+4);ctx.textAlign="left";
+    ctx.fillStyle=label==="최소 보유 자금 대비"?(r.minDiff>=0?"#047857":"#b91c1c"):"#111827";
+    ctx.font="800 38px Pretendard, sans-serif";ctx.textAlign="right";ctx.fillText(value,968,y+4);ctx.textAlign="left";
     ctx.strokeStyle="#e5e7eb";ctx.beginPath();ctx.moveTo(112,y+42);ctx.lineTo(968,y+42);ctx.stroke();
     y+=145;
   });
   ctx.fillStyle="#6b7280";ctx.font="500 22px Pretendard, sans-serif";
   ctx.fillText("주거비 반영 후 잔액에는 식비·교통비 등 변동 생활비가 포함되지 않습니다.",112,1135);
   if(r.initialUnknown||r.monthlyUnknown){
+    const unknown=[...unknownLabels(item.housing,OPTIONAL_INITIAL),...unknownLabels(item.housing,OPTIONAL_MONTHLY)];
     ctx.fillStyle="#9a3412";ctx.font="600 22px Pretendard, sans-serif";
-    ctx.fillText("미확인 비용이 있어 현재 확인된 금액 기준으로 표시했습니다.",112,1185);
+    ctx.fillText("미확인 비용: "+unknown.join(", "),112,1185);
   }
   ctx.fillStyle="#94a3b8";ctx.font="500 20px Pretendard, sans-serif";ctx.fillText("haebolssem",112,1285);
   const a=document.createElement("a");
@@ -78,7 +83,6 @@ function finance(){
 function housing(){
   const monthly=state.housing.transactionType==="monthlyRent";
   return '<div class="step">2 / 2</div><h2>주거 조건 및 초기 비용</h2><p class="muted">실제 매물이든 가정한 조건이든 같은 방식으로 계산할 수 있어요.</p>'+
-  '<section class="section ai-input-helper"><div class="ai-helper-head"><div><h3>매물 정보 빠르게 입력하기</h3><p class="helper">매물 설명을 붙여넣으면 AI가 명시된 비용만 찾아 입력칸에 채워요. 추정은 하지 않으며, 채운 값은 계산 전에 직접 확인할 수 있어요.</p></div><span class="optional-badge">선택</span></div><textarea data-listing-text maxlength="5000" placeholder="예: 망원동 원룸, 보증금 1,000만원 / 월세 60만원 / 관리비 5만원, 인터넷 포함"></textarea><div class="actions compact"><button class="btn secondary" data-ai-fill>AI로 비용 항목 채우기</button></div><div class="helper" data-ai-fill-status></div></section>'+
   '<section class="section stack"><div class="field"><label>거래 유형</label><div class="segment"><button data-type="monthlyRent" class="'+(monthly?"active":"")+'">월세</button><button data-type="jeonse" class="'+(!monthly?"active":"")+'">전세</button></div></div>'+
   '<div class="field"><label>이름</label><input data-housing="name" value="'+escapeHtml(state.housing.name)+'" placeholder="예: 망원동 A 원룸"><div class="error" data-error="name"></div></div>'+
   '<div class="field"><label>보증금</label><div class="input-wrap"><input inputmode="numeric" data-housing="deposit" value="'+formatInput(state.housing.deposit)+'" placeholder="0"><span>원</span></div><div class="error" data-error="deposit"></div></div>'+
@@ -101,15 +105,25 @@ function result(){
   const saved=exists&&!state.isDirty;
   const saveLabel=saved?"저장 완료":(exists?"변경 저장":"저장하기");
   const diff=r.minDiff>=0?'<span class="status-positive">+'+money(r.minDiff)+'</span>':'<span class="status-negative">-'+money(Math.abs(r.minDiff))+'</span>';
+  const initialUnknownNames=unknownLabels(state.housing,OPTIONAL_INITIAL);
+  const monthlyUnknownNames=unknownLabels(state.housing,OPTIONAL_MONTHLY);
+  const allUnknown=[...initialUnknownNames,...monthlyUnknownNames];
   let body='<h2>'+escapeHtml(state.housing.name)+'</h2><p class="muted">'+(state.housing.transactionType==="monthlyRent"?"월세":"전세")+' 조건 계산 결과</p>';
-  if(r.initialUnknown||r.monthlyUnknown) body+='<div class="notice">모르는 비용이 있어 확인된 금액 기준으로 계산했습니다. 비용은 최소값, 잔액은 최대값으로 표시됩니다.</div>';
+  if(allUnknown.length) body+='<div class="notice"><strong>미확인 비용: '+allUnknown.map(escapeHtml).join(", ")+'</strong><br>해당 비용은 0원으로 처리하지 않고 합계에서 제외했습니다. 비용은 최소값, 잔액은 최대값으로 표시됩니다.</div>';
   body+='<section class="section result-grid">'+
-    metric("초기 필요 자금",(r.initialUnknown?"최소 ":"")+money(r.initialKnown),r.initialUnknown?"미확인 비용 "+r.initialUnknown+"건":"")+
+    metric("초기 필요 자금",(r.initialUnknown?"최소 ":"")+money(r.initialKnown),initialUnknownNames.length?"미확인: "+initialUnknownNames.join(", "):"")+
     metric("초기 비용 후 잔액",(r.initialUnknown?"최대 ":"")+money(r.initialBalance),r.initialUnknown?"미확인 비용 반영 시 실제 잔액은 더 적어질 수 있어요.":"")+
     metric("최소 보유 자금 대비",diff,r.minDiff>=0?"설정한 최소 보유 자금보다 더 남습니다.":"설정한 최소 보유 자금보다 부족합니다.")+
-    metric("월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown),r.monthlyUnknown?"미확인 비용 "+r.monthlyUnknown+"건":"")+
+    metric("월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown),monthlyUnknownNames.length?"미확인: "+monthlyUnknownNames.join(", "):"")+
     metric("주거비 반영 후 잔액",(r.monthlyUnknown?"최대 ":"")+money(r.monthlyBalance),"식비·교통비 등 변동 생활비는 포함되지 않았어요.")+
-  '</section>';
+  '</section>'+
+  '<details class="calc-details"><summary>계산 내역 보기</summary><div class="calc-details-body">'+
+    calcLine("초기 필요 자금","보증금 + 중개보수 + 이사비 + 입주 청소비 + 기타 초기 비용",(r.initialUnknown?"최소 ":"")+money(r.initialKnown),initialUnknownNames.length?"미확인 항목("+initialUnknownNames.join(", ")+")은 합계에서 제외했습니다.":"")+
+    calcLine("초기 비용 후 잔액","가용 자금 "+money(num(state.finance.availableFunds))+" - 초기 필요 자금 "+(r.initialUnknown?"최소 ":"")+money(r.initialKnown),(r.initialUnknown?"최대 ":"")+money(r.initialBalance))+
+    calcLine("최소 보유 자금 대비","초기 비용 후 잔액 - 최소 보유 자금 "+money(num(state.finance.minimumFunds)),(r.minDiff>=0?"+":"-")+money(Math.abs(r.minDiff)))+
+    calcLine("월 주거비",(state.housing.transactionType==="monthlyRent"?"월세 + ":"")+"관리비 + 주차비 + 인터넷 + 기타 월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown),monthlyUnknownNames.length?"미확인 항목("+monthlyUnknownNames.join(", ")+")은 합계에서 제외했습니다.":"")+
+    calcLine("주거비 반영 후 잔액","월 소득 "+money(num(state.finance.monthlyIncome))+" - 월 고정지출 "+money(num(state.finance.fixedExpenses))+" - 월 주거비 "+(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown),(r.monthlyUnknown?"최대 ":"")+money(r.monthlyBalance),"식비·교통비 등 변동 생활비는 포함하지 않습니다.")+
+  '</div></details>';
   body+='<section class="section"><h3>초기 비용 상세</h3><div class="card breakdown">'+row("보증금",money(num(state.housing.deposit)))+OPTIONAL_INITIAL.map(([k,l])=>row(l,costDisplay(state.housing[k]))).join("")+'</div></section>';
   body+='<section class="section"><h3>월 주거비 상세</h3><div class="card breakdown">'+row("월세",state.housing.transactionType==="monthlyRent"?money(num(state.housing.monthlyRent)):"—")+OPTIONAL_MONTHLY.map(([k,l])=>row(l,costDisplay(state.housing[k]))).join("")+'</div></section>';
   body+='<div class="actions"><button class="btn primary" data-save '+(saved?"disabled":"")+'>'+saveLabel+'</button><button class="btn secondary" data-export-current>결과 이미지로 저장</button><button class="btn secondary" data-edit-housing>주거 조건 변경</button><button class="btn secondary" data-go="finance">내 재정 변경</button><button class="btn ghost" data-new>다른 조건 계산</button><button class="btn ghost" data-go="saved">저장 내역 보기</button></div>';
@@ -188,35 +202,6 @@ function snapshot(){
 function openCalc(id,edit){
   const x=list().find(v=>v.id===id); if(!x)return; state.finance=structuredClone(x.financeSnapshot);state.housing=structuredClone(x.housing);state.lastResult=x.results;state.editingId=x.id;state.isDirty=edit;state.view=edit?"housing":"result";render()
 }
-async function fillFromListing(){
-  const text=$("[data-listing-text]")?.value.trim();
-  const status=$("[data-ai-fill-status]");
-  const button=$("[data-ai-fill]");
-  if(!text){if(status)status.textContent="매물 정보를 먼저 붙여넣어주세요.";return}
-  if(button){button.disabled=true;button.textContent="비용 항목을 찾는 중..."}
-  if(status)status.textContent="";
-  try{
-    const r=await fetch("/api/extract",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
-    const d=await r.json();
-    if(!r.ok)throw new Error(d.error||"AI 입력 도우미를 사용할 수 없습니다.");
-    if(d.name&&!state.housing.name)state.housing.name=String(d.name);
-    if(d.transactionType==="monthlyRent"||d.transactionType==="jeonse")state.housing.transactionType=d.transactionType;
-    if(Number.isFinite(Number(d.deposit)))state.housing.deposit=String(Math.trunc(Number(d.deposit)));
-    if(Number.isFinite(Number(d.monthlyRent)))state.housing.monthlyRent=String(Math.trunc(Number(d.monthlyRent)));
-    ["managementFee","parkingFee","internet","otherMonthly","brokerageFee","movingFee","cleaningFee","otherInitial"].forEach(k=>{
-      const v=d[k];
-      if(v&&["amount","zero","unknown","unset"].includes(v.status)){
-        state.housing[k]={status:v.status,amount:v.status==="amount"&&Number.isFinite(Number(v.amount))?String(Math.trunc(Number(v.amount))):null};
-      }
-    });
-    state.isDirty=!!state.editingId;
-    render();
-    const s=$("[data-ai-fill-status]"); if(s)s.textContent="AI가 찾은 값을 채웠어요. 계산하기 전에 각 항목을 확인해주세요.";
-  }catch(e){
-    if(status)status.textContent=e.message;
-    if(button){button.disabled=false;button.textContent="AI로 비용 항목 채우기"}
-  }
-}
 async function askAI(){
   const chosen=list().filter(x=>state.selected.includes(x.id)); const b=$("[data-ai]"); if(b){b.disabled=true;b.textContent="차이를 정리하는 중..."}
   try{const r=await fetch("/api/compare",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scenarios:chosen})});const d=await r.json();if(!r.ok)throw new Error(d.error||"AI 해석을 불러오지 못했습니다.");state.aiResult=d}catch(e){state.aiResult={summary:e.message+" 계산 및 비교 기능은 정상적으로 사용할 수 있습니다."}} render()
@@ -244,7 +229,6 @@ function bind(){
   document.querySelectorAll("[data-export]").forEach(b=>b.onclick=()=>{const x=list().find(v=>v.id===b.dataset.export);if(x)exportConditionImage(x)});
   document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>{saveList(list().filter(x=>x.id!==b.dataset.delete));state.selected=state.selected.filter(x=>x!==b.dataset.delete);render()});
   $("[data-compare]")?.addEventListener("click",()=>{state.view="compare";state.aiResult=null;render()});
-  $("[data-ai-fill]")?.addEventListener("click",fillFromListing);
   $("[data-ai]")?.addEventListener("click",askAI)
 }
 render();
