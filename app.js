@@ -2,7 +2,7 @@
 import {OPTIONAL_MONTHLY,OPTIONAL_INITIAL,newHousing,money,num,sanitize,formatInput,escapeHtml,calculate,costDisplay} from "./lib.js";
 
 const $=s=>document.querySelector(s);
-const KEY={finance:"haebolssem_finance_v2",calculations:"haebolssem_calculations_v2",ai:"haebolssem_ai_v3"};
+const KEY={finance:"haebolssem_finance_v2",calculations:"haebolssem_calculations_v2",ai:"haebolssem_ai_v4"};
 const load=k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}};
 const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 const list=()=>load(KEY.calculations)||[];
