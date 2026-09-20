@@ -83,7 +83,7 @@ export default async function handler(req,res){
     ].join("\n");
 
     const controller=new AbortController();
-    const timeout=setTimeout(()=>controller.abort(),12000);
+    const timeout=setTimeout(()=>controller.abort(),22000);
     let gatewayResponse;
     try{
       gatewayResponse=await fetch("https://ai-gateway.vercel.sh/v1/chat/completions",{
@@ -128,7 +128,7 @@ export default async function handler(req,res){
     return res.status(200).json(parsed);
   }catch(e){
     console.error("AI_COMPARE_ERROR",e);
-    if(e?.name==="AbortError") return res.status(504).json({error:"AI 응답 시간이 길어 요청이 종료됐어요. 다시 시도해주세요."});
+    if(e?.name==="AbortError") return res.status(504).json({error:"AI 응답이 지연되고 있어요. 다시 시도해주세요."});
     return res.status(500).json({error:"AI 비교 기능 실행 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."});
   }
 }
