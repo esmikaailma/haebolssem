@@ -67,7 +67,7 @@ export default async function handler(req,res){
       "deterministicFacts:",
       JSON.stringify(deterministic)
     ].join("\n");
-    const result=await generateText({model:"openai/gpt-5.6-luna",prompt,maxOutputTokens:500});
+    const result=await generateText({model:"alibaba/qwen3.5-flash",prompt,maxOutputTokens:320});
     const raw=result.text||"";
     const cleaned=raw.replace(/^\`\`\`json\s*/,"").replace(/\`\`\`\s*$/,"").trim();
     let parsed;
