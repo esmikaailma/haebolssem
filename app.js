@@ -109,7 +109,7 @@ function finance(){
   field("monthlyIncome","월 소득","수입이 일정하지 않다면 최근 1년간 평균 월 소득을 입력하세요.")+
   field("fixedExpenses","월 고정지출","독립 후에도 계속 발생하는 대출 상환·보험료·통신비·정기 구독료 등을 합산해 입력하세요.")+
   field("minimumFunds","최소 보유 자금","독립 비용을 지출한 뒤에도 최소한 남겨두고 싶은 자금을 입력하세요.")+
-  '<div class="quick-set"><div class="helper">가용 자금 기준 빠른 설정</div><div class="quick-set-buttons"><button type="button" data-min-pct="10">10%</button><button type="button" data-min-pct="20">20%</button><button type="button" data-min-pct="30">30%</button></div></div>'+
+  '<div class="quick-set"><div class="helper">가용 자금 중 최소한 남겨둘 비율을 빠르게 설정할 수 있어요.</div><div class="quick-set-buttons"><button type="button" data-min-pct="25">25% 남기기</button><button type="button" data-min-pct="50">50% 남기기</button><button type="button" data-min-pct="75">75% 남기기</button></div></div>'+
   '</section><div class="actions"><button class="btn primary" data-next-finance>다음</button><button class="btn ghost" data-go="home">취소</button></div>'
 }
 function housing(){
