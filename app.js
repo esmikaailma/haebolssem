@@ -11,7 +11,7 @@ const saveList=v=>save(KEY.calculations,v);
 let state={
   view:"home",
   finance:load(KEY.finance)||{availableFunds:"",monthlyIncome:"",fixedExpenses:"",minimumFunds:""},
-  housing:newHousing(),editingId:null,lastResult:null,selected:[],aiResult:null
+  housing:newHousing(),editingId:null,lastResult:null,selected:[],aiResult:null,isDirty:false
 };
 
 function row(label,val){return '<div class="row"><span>'+label+'</span><strong>'+val+'</strong></div>'}
@@ -96,7 +96,9 @@ function housing(){
 }
 function result(){
   const r=state.lastResult||calculate(state.finance,state.housing);
-  const saved=state.editingId&&list().some(x=>x.id===state.editingId);
+  const exists=state.editingId&&list().some(x=>x.id===state.editingId);
+  const saved=exists&&!state.isDirty;
+  const saveLabel=saved?"저장 완료":(exists?"변경 저장":"저장하기");
   const diff=r.minDiff>=0?'<span class="status-positive">+'+money(r.minDiff)+'</span>':'<span class="status-negative">-'+money(Math.abs(r.minDiff))+'</span>';
   let body='<h2>'+escapeHtml(state.housing.name)+'</h2><p class="muted">'+(state.housing.transactionType==="monthlyRent"?"월세":"전세")+' 조건 계산 결과</p>';
   if(r.initialUnknown||r.monthlyUnknown) body+='<div class="notice">모르는 비용이 있어 확인된 금액 기준으로 계산했습니다. 비용은 최소값, 잔액은 최대값으로 표시됩니다.</div>';
@@ -109,7 +111,7 @@ function result(){
   '</section>';
   body+='<section class="section"><h3>초기 비용 상세</h3><div class="card breakdown">'+row("보증금",money(num(state.housing.deposit)))+OPTIONAL_INITIAL.map(([k,l])=>row(l,costDisplay(state.housing[k]))).join("")+'</div></section>';
   body+='<section class="section"><h3>월 주거비 상세</h3><div class="card breakdown">'+row("월세",state.housing.transactionType==="monthlyRent"?money(num(state.housing.monthlyRent)):"—")+OPTIONAL_MONTHLY.map(([k,l])=>row(l,costDisplay(state.housing[k]))).join("")+'</div></section>';
-  body+='<div class="actions"><button class="btn primary" data-save '+(saved?"disabled":"")+'>'+(saved?"저장 완료":"저장하기")+'</button><button class="btn secondary" data-export-current>결과 이미지로 저장</button><button class="btn secondary" data-edit-housing>주거 조건 변경</button><button class="btn secondary" data-go="finance">내 재정 변경</button><button class="btn ghost" data-new>다른 조건 계산</button><button class="btn ghost" data-go="saved">저장 내역 보기</button></div>';
+  body+='<div class="actions"><button class="btn primary" data-save '+(saved?"disabled":"")+'>'+saveLabel+'</button><button class="btn secondary" data-export-current>결과 이미지로 저장</button><button class="btn secondary" data-edit-housing>주거 조건 변경</button><button class="btn secondary" data-go="finance">내 재정 변경</button><button class="btn ghost" data-new>다른 조건 계산</button><button class="btn ghost" data-go="saved">저장 내역 보기</button></div>';
   return body
 }
 function saved(){
@@ -183,7 +185,7 @@ function snapshot(){
   return {id:state.editingId||crypto.randomUUID(),name:state.housing.name.trim(),transactionType:state.housing.transactionType,housing:structuredClone(state.housing),financeSnapshot:structuredClone(state.finance),results:calculate(state.finance,state.housing),createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()}
 }
 function openCalc(id,edit){
-  const x=list().find(v=>v.id===id); if(!x)return; state.finance=structuredClone(x.financeSnapshot);state.housing=structuredClone(x.housing);state.lastResult=x.results;state.editingId=x.id;state.view=edit?"housing":"result";render()
+  const x=list().find(v=>v.id===id); if(!x)return; state.finance=structuredClone(x.financeSnapshot);state.housing=structuredClone(x.housing);state.lastResult=x.results;state.editingId=x.id;state.isDirty=edit;state.view=edit?"housing":"result";render()
 }
 async function askAI(){
   const chosen=list().filter(x=>state.selected.includes(x.id)); const b=$("[data-ai]"); if(b){b.disabled=true;b.textContent="차이를 정리하는 중..."}
@@ -194,18 +196,18 @@ function render(){
 }
 function bind(){
   document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{state.view=b.dataset.go;state.aiResult=null;render()});
-  document.querySelectorAll("[data-start]").forEach(b=>b.onclick=()=>{state.view="finance";state.editingId=null;state.housing=newHousing();render()});
-  document.querySelectorAll("[data-finance]").forEach(i=>i.oninput=e=>{state.finance[i.dataset.finance]=sanitize(e.target.value);e.target.value=formatInput(state.finance[i.dataset.finance])});
+  document.querySelectorAll("[data-start]").forEach(b=>b.onclick=()=>{state.view="finance";state.editingId=null;state.housing=newHousing();state.isDirty=false;render()});
+  document.querySelectorAll("[data-finance]").forEach(i=>i.oninput=e=>{state.finance[i.dataset.finance]=sanitize(e.target.value);state.isDirty=!!state.editingId;e.target.value=formatInput(state.finance[i.dataset.finance])});
   $("[data-next-finance]")?.addEventListener("click",()=>{const e=validateFinance();document.querySelectorAll("[data-error]").forEach(x=>x.textContent=e[x.dataset.error]||"");if(Object.keys(e).length)return;save(KEY.finance,state.finance);state.view="housing";render()});
-  document.querySelectorAll("[data-type]").forEach(b=>b.onclick=()=>{state.housing.transactionType=b.dataset.type;if(b.dataset.type==="jeonse")state.housing.monthlyRent="";render()});
-  document.querySelectorAll("[data-housing]").forEach(i=>i.oninput=e=>{const k=i.dataset.housing;state.housing[k]=k==="name"?e.target.value:sanitize(e.target.value);if(k!=="name")e.target.value=formatInput(state.housing[k])});
-  document.querySelectorAll("[data-cost]").forEach(b=>b.onclick=()=>{const [k,s]=b.dataset.cost.split(":");state.housing[k]={status:s,amount:s==="amount"?"":null};render()});
-  document.querySelectorAll("[data-cost-amount]").forEach(i=>i.oninput=e=>{const k=i.dataset.costAmount;state.housing[k].amount=sanitize(e.target.value);e.target.value=formatInput(state.housing[k].amount)});
+  document.querySelectorAll("[data-type]").forEach(b=>b.onclick=()=>{state.housing.transactionType=b.dataset.type;state.isDirty=!!state.editingId;if(b.dataset.type==="jeonse")state.housing.monthlyRent="";render()});
+  document.querySelectorAll("[data-housing]").forEach(i=>i.oninput=e=>{const k=i.dataset.housing;state.housing[k]=k==="name"?e.target.value:sanitize(e.target.value);state.isDirty=!!state.editingId;if(k!=="name")e.target.value=formatInput(state.housing[k])});
+  document.querySelectorAll("[data-cost]").forEach(b=>b.onclick=()=>{const [k,s]=b.dataset.cost.split(":");state.housing[k]={status:s,amount:s==="amount"?"":null};state.isDirty=!!state.editingId;render()});
+  document.querySelectorAll("[data-cost-amount]").forEach(i=>i.oninput=e=>{const k=i.dataset.costAmount;state.housing[k].amount=sanitize(e.target.value);state.isDirty=!!state.editingId;e.target.value=formatInput(state.housing[k].amount)});
   $("[data-calc]")?.addEventListener("click",()=>{const e=validateHousing();document.querySelectorAll("[data-error]").forEach(x=>x.textContent=e[x.dataset.error]||"");if(Object.keys(e).length)return;state.lastResult=calculate(state.finance,state.housing);state.view="result";render()});
-  $("[data-save]")?.addEventListener("click",()=>{const item=snapshot(),a=list(),i=a.findIndex(x=>x.id===item.id);if(i>=0)a[i]=item;else a.unshift(item);saveList(a);state.editingId=item.id;render()});
+  $("[data-save]")?.addEventListener("click",()=>{const item=snapshot(),a=list(),i=a.findIndex(x=>x.id===item.id);if(i>=0)a[i]=item;else a.unshift(item);saveList(a);state.editingId=item.id;state.isDirty=false;render()});
   $("[data-export-current]")?.addEventListener("click",()=>exportConditionImage({name:state.housing.name.trim(),transactionType:state.housing.transactionType,housing:structuredClone(state.housing),financeSnapshot:structuredClone(state.finance),results:calculate(state.finance,state.housing)}));
   $("[data-edit-housing]")?.addEventListener("click",()=>{state.view="housing";render()});
-  document.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>{state.housing=newHousing();state.editingId=null;state.lastResult=null;state.view="housing";render()});
+  document.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>{state.housing=newHousing();state.editingId=null;state.lastResult=null;state.isDirty=false;state.view="housing";render()});
   document.querySelectorAll("[data-select]").forEach(i=>i.onchange=e=>{const id=i.dataset.select;if(e.target.checked&&!state.selected.includes(id)){if(state.selected.length>=3){alert("비교는 최대 3개까지 가능해요.");return render()}state.selected.push(id)}else state.selected=state.selected.filter(x=>x!==id);render()});
   document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openCalc(b.dataset.open,false));
   document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openCalc(b.dataset.edit,true));
