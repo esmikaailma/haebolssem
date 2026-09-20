@@ -263,3 +263,7 @@ thead th{background:#f8fafc;font-size:13px}
 .ai-checks ul{margin:8px 0;padding-left:20px}
 .ai-balance-note{margin:14px 0}
 @media(max-width:560px){.ai-summary-grid{grid-template-columns:1fr}}
+
+.finance-diff-title{margin-top:10px;font-weight:800;color:#7c2d12}
+.finance-diff-list{margin:7px 0 9px;padding-left:20px}
+.finance-diff-list li+li{margin-top:5px}
