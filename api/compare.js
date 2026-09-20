@@ -72,10 +72,12 @@ export default async function handler(req,res){
       "반드시 제공된 deterministicFacts만 사용하세요. 숫자를 새로 계산·추정·변경하지 마세요.",
       "특정 조건을 추천하거나 순위화하거나 최적/최악, 안전/위험, 가능/불가능으로 판정하지 마세요.",
       "minimumFundsDifference가 양수면 최소 보유 자금보다 그만큼 더 남고, 음수면 그만큼 부족하다는 사실만 설명하세요.",
-      "monthlyBalanceAfterHousing는 식비·교통비 등 변동 생활비를 제외한 값이므로 생활 가능 금액이라고 표현하지 마세요.",
-      "unknownItems가 있으면 해당 비용이 비교에 완전히 반영되지 않았다고 알려주세요.",
+      "monthlyBalanceAfterHousing는 '생활비 사용 가능 금액'으로 표현하세요. 월 소득에서 월 고정지출과 확인된 월 주거비를 뺀 금액이며 식비·교통비·저축 등 실제 지출 전 금액입니다.",
+      "조건별 interpretation은 숫자를 반복 나열하지 말고 해당 조건의 초기 자금 상태와 월 부담을 연결해 한 문장으로만 설명하세요.",
+      "monthlyComparison은 조건별 생활비 사용 가능 금액의 차이를 가장 이해하기 쉽게 한 문장으로 비교하세요. 추천·순위 표현은 금지합니다.",
+      "unknownItems나 monthlyBalanceAfterHousing 같은 내부 필드명은 절대 출력하지 마세요.",
       "한국어로 아래 JSON만 반환하세요.",
-      '{"basis":"재정 기준 1문장","conditions":[{"name":"조건명","interpretation":"초기 부담과 월 부담 1문장"}],"tradeoff":"주요 비용 구조 차이 1문장","checkPoints":["확인할 점 최대 2개"]}',
+      '{"conditions":[{"name":"조건명","interpretation":"조건별 해석 1문장"}],"monthlyComparison":"생활비 사용 가능 금액 비교 1문장"}',
       "deterministicFacts:",
       JSON.stringify(deterministic)
     ].join("\n");
@@ -93,7 +95,7 @@ export default async function handler(req,res){
         body:JSON.stringify({
           model:"alibaba/qwen3.5-flash",
           messages:[{role:"user",content:prompt}],
-          max_tokens:280,
+          max_tokens:220,
           temperature:0.1,
           reasoning:{effort:"none"}
         }),
