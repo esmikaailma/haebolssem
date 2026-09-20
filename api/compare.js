@@ -24,6 +24,9 @@ const spread=(scenarios,fields)=>{
 export default async function handler(req,res){
   if(req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
   try{
+    if(!process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN){
+      return res.status(503).json({error:"AI Gateway 인증 정보가 Preview 환경에 적용되지 않았어요. AI_GATEWAY_API_KEY 환경변수와 Redeploy 여부를 확인해주세요."});
+    }
     const scenarios=req.body?.scenarios||[];
     if(scenarios.length<2||scenarios.length>3) return res.status(400).json({error:"2~3개의 조건이 필요합니다."});
     const financeKeys=scenarios.map(s=>financeKey(s.financeSnapshot||{}));
@@ -77,6 +80,9 @@ export default async function handler(req,res){
     console.error("AI_COMPARE_ERROR",e);
     const message=String(e?.message||e||"");
     if(message.includes("AI_RESPONSE_PARSE_FAILED")) return res.status(502).json({error:"AI 응답을 정리하는 과정에서 오류가 발생했어요. 잠시 후 다시 시도해주세요."});
-    return res.status(500).json({error:"AI 비교 기능을 불러오지 못했어요. Vercel AI Gateway 연결 상태를 확인해주세요."});
+    if(/credit card|customer_verification_required/i.test(message)) return res.status(402).json({error:"AI Gateway 사용을 위해 Vercel에서 결제 카드 인증이 필요해요. 카드를 등록한 뒤 AI Gateway 크레딧 상태를 확인해주세요."});
+    if(/insufficient|credit|balance|payment method|billing/i.test(message)) return res.status(402).json({error:"AI Gateway 크레딧 또는 결제 설정을 확인해주세요."});
+    if(/403|forbidden|access_denied/i.test(message)) return res.status(403).json({error:"AI Gateway 접근이 거부됐어요. API Key의 팀/프로젝트 범위와 크레딧 활성화 상태를 확인해주세요."});
+    return res.status(500).json({error:"AI 비교 기능을 불러오지 못했어요. Vercel Runtime Logs에서 AI_COMPARE_ERROR를 확인해주세요."});
   }
 }
