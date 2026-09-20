@@ -65,7 +65,7 @@ function costControl(k,label,helper){
   (c.status==="amount"?'<div class="input-wrap"><input inputmode="numeric" data-cost-amount="'+k+'" value="'+formatInput(c.amount||"")+'" placeholder="0"><span>원</span></div>':'')+'</div>'
 }
 function home(){
-  return '<section class="hero"><div class="eyebrow">독립 주거 비용 계산기</div><h1>독립, 해 볼 셈이라면<br>먼저 셈해보세요.</h1><p class="muted">독립할 때 필요한 초기 비용과 매달 부담할 주거비를 계산하고 비교해보세요.</p><div class="actions"><button class="btn primary" data-start>계산 시작하기</button><button class="btn secondary" data-go="saved">저장 내역 보기</button></div></section>'
+  return '<section class="hero"><div class="eyebrow">독립 주거 비용 계산기</div><h1>독립, 해볼 셈이라면?</h1><p class="muted">독립할 때 필요한 초기 비용과 매달 부담할 주거비를 계산하고 비교해보세요.</p><div class="actions"><button class="btn primary" data-start>계산 시작하기</button><button class="btn secondary" data-go="saved">저장 내역 보기</button></div></section>'
 }
 function finance(){
   return '<div class="step">1 / 2</div><h2>독립 비용 계산의 기준</h2><p class="muted">내 재정에서 독립 비용을 계산할 기준을 먼저 입력하세요.</p><section class="section stack">'+
@@ -78,6 +78,7 @@ function finance(){
 function housing(){
   const monthly=state.housing.transactionType==="monthlyRent";
   return '<div class="step">2 / 2</div><h2>주거 조건 및 초기 비용</h2><p class="muted">실제 매물이든 가정한 조건이든 같은 방식으로 계산할 수 있어요.</p>'+
+  '<section class="section ai-input-helper"><div class="ai-helper-head"><div><h3>매물 정보 빠르게 입력하기</h3><p class="helper">매물 설명을 붙여넣으면 AI가 명시된 비용만 찾아 입력칸에 채워요. 추정은 하지 않으며, 채운 값은 계산 전에 직접 확인할 수 있어요.</p></div><span class="optional-badge">선택</span></div><textarea data-listing-text maxlength="5000" placeholder="예: 망원동 원룸, 보증금 1,000만원 / 월세 60만원 / 관리비 5만원, 인터넷 포함"></textarea><div class="actions compact"><button class="btn secondary" data-ai-fill>AI로 비용 항목 채우기</button></div><div class="helper" data-ai-fill-status></div></section>'+
   '<section class="section stack"><div class="field"><label>거래 유형</label><div class="segment"><button data-type="monthlyRent" class="'+(monthly?"active":"")+'">월세</button><button data-type="jeonse" class="'+(!monthly?"active":"")+'">전세</button></div></div>'+
   '<div class="field"><label>이름</label><input data-housing="name" value="'+escapeHtml(state.housing.name)+'" placeholder="예: 망원동 A 원룸"><div class="error" data-error="name"></div></div>'+
   '<div class="field"><label>보증금</label><div class="input-wrap"><input inputmode="numeric" data-housing="deposit" value="'+formatInput(state.housing.deposit)+'" placeholder="0"><span>원</span></div><div class="error" data-error="deposit"></div></div>'+
@@ -187,6 +188,35 @@ function snapshot(){
 function openCalc(id,edit){
   const x=list().find(v=>v.id===id); if(!x)return; state.finance=structuredClone(x.financeSnapshot);state.housing=structuredClone(x.housing);state.lastResult=x.results;state.editingId=x.id;state.isDirty=edit;state.view=edit?"housing":"result";render()
 }
+async function fillFromListing(){
+  const text=$("[data-listing-text]")?.value.trim();
+  const status=$("[data-ai-fill-status]");
+  const button=$("[data-ai-fill]");
+  if(!text){if(status)status.textContent="매물 정보를 먼저 붙여넣어주세요.";return}
+  if(button){button.disabled=true;button.textContent="비용 항목을 찾는 중..."}
+  if(status)status.textContent="";
+  try{
+    const r=await fetch("/api/extract",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||"AI 입력 도우미를 사용할 수 없습니다.");
+    if(d.name&&!state.housing.name)state.housing.name=String(d.name);
+    if(d.transactionType==="monthlyRent"||d.transactionType==="jeonse")state.housing.transactionType=d.transactionType;
+    if(Number.isFinite(Number(d.deposit)))state.housing.deposit=String(Math.trunc(Number(d.deposit)));
+    if(Number.isFinite(Number(d.monthlyRent)))state.housing.monthlyRent=String(Math.trunc(Number(d.monthlyRent)));
+    ["managementFee","parkingFee","internet","otherMonthly","brokerageFee","movingFee","cleaningFee","otherInitial"].forEach(k=>{
+      const v=d[k];
+      if(v&&["amount","zero","unknown","unset"].includes(v.status)){
+        state.housing[k]={status:v.status,amount:v.status==="amount"&&Number.isFinite(Number(v.amount))?String(Math.trunc(Number(v.amount))):null};
+      }
+    });
+    state.isDirty=!!state.editingId;
+    render();
+    const s=$("[data-ai-fill-status]"); if(s)s.textContent="AI가 찾은 값을 채웠어요. 계산하기 전에 각 항목을 확인해주세요.";
+  }catch(e){
+    if(status)status.textContent=e.message;
+    if(button){button.disabled=false;button.textContent="AI로 비용 항목 채우기"}
+  }
+}
 async function askAI(){
   const chosen=list().filter(x=>state.selected.includes(x.id)); const b=$("[data-ai]"); if(b){b.disabled=true;b.textContent="차이를 정리하는 중..."}
   try{const r=await fetch("/api/compare",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scenarios:chosen})});const d=await r.json();if(!r.ok)throw new Error(d.error||"AI 해석을 불러오지 못했습니다.");state.aiResult=d}catch(e){state.aiResult={summary:e.message+" 계산 및 비교 기능은 정상적으로 사용할 수 있습니다."}} render()
@@ -214,6 +244,7 @@ function bind(){
   document.querySelectorAll("[data-export]").forEach(b=>b.onclick=()=>{const x=list().find(v=>v.id===b.dataset.export);if(x)exportConditionImage(x)});
   document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>{saveList(list().filter(x=>x.id!==b.dataset.delete));state.selected=state.selected.filter(x=>x!==b.dataset.delete);render()});
   $("[data-compare]")?.addEventListener("click",()=>{state.view="compare";state.aiResult=null;render()});
+  $("[data-ai-fill]")?.addEventListener("click",fillFromListing);
   $("[data-ai]")?.addEventListener("click",askAI)
 }
 render();
