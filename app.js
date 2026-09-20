@@ -270,6 +270,26 @@ function compare(){
   const chosen=list().filter(x=>state.selected.includes(x.id));
   if(chosen.length<2) return '<div class="empty">비교할 조건을 2개 이상 선택해주세요.</div>';
   const sameFinance=chosen.every(x=>JSON.stringify(x.financeSnapshot)===JSON.stringify(chosen[0].financeSnapshot));
+  const financeDiffSummary=()=>{
+    const fields=[
+      ["가용 자금","availableFunds"],
+      ["월 소득","monthlyIncome"],
+      ["월 고정지출","fixedExpenses"],
+      ["최소 보유 자금","minimumFunds"]
+    ];
+    return fields.map(([label,key])=>{
+      const groups=new Map();
+      chosen.forEach(item=>{
+        const value=num(item.financeSnapshot[key]);
+        const names=groups.get(value)||[];
+        names.push(item.name);
+        groups.set(value,names);
+      });
+      if(groups.size<=1)return "";
+      const parts=[...groups.entries()].map(([value,names])=>names.map(escapeHtml).join("·")+" "+money(value));
+      return '<li><strong>'+label+'</strong>: '+parts.join(" / ")+'</li>';
+    }).filter(Boolean).join("");
+  };
   const groups=[
     {title:"재정 기준",rows:[
       ["가용 자금",x=>money(num(x.financeSnapshot.availableFunds))],
@@ -301,7 +321,10 @@ function compare(){
     ]}
   ];
   let body='<h2>비교</h2><p class="muted">초기 부담과 매달 부담의 차이를 함께 확인하세요.</p>';
-  if(!sameFinance) body+='<div class="notice">선택한 조건의 계산 기준 재정이 서로 다릅니다. 아래 재정 기준의 차이를 확인한 뒤 같은 기준으로 다시 계산하면 AI 비교를 사용할 수 있어요.</div>';
+  if(!sameFinance){
+    const diffItems=financeDiffSummary();
+    body+='<div class="notice"><strong>선택한 조건의 계산 기준 재정이 서로 다릅니다.</strong><div class="finance-diff-title">다른 재정 기준</div><ul class="finance-diff-list">'+diffItems+'</ul><div>같은 기준으로 다시 계산하면 AI 비교를 사용할 수 있어요.</div></div>';
+  }
   body+='<div class="compare-desktop"><section class="section"><div class="table-wrap"><table><thead><tr><th>항목</th>'+chosen.map(x=>'<th>'+escapeHtml(x.name)+'</th>').join("")+'</tr></thead><tbody>';
   groups.forEach(group=>{
     body+='<tr class="group-row"><td colspan="'+(chosen.length+1)+'">'+group.title+'</td></tr>';
