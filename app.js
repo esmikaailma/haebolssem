@@ -7,6 +7,11 @@ const load=k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}
 const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 const list=()=>load(KEY.calculations)||[];
 const saveList=v=>save(KEY.calculations,v);
+const normalizeConditionName=v=>String(v??"").normalize("NFKC").trim().replace(/\s+/g," ").toLocaleLowerCase("ko-KR");
+const isDuplicateConditionName=name=>{
+  const normalized=normalizeConditionName(name);
+  return normalized!==""&&list().some(x=>x.id!==state.editingId&&normalizeConditionName(x.name)===normalized);
+};
 
 let state={
   view:"home",
@@ -252,7 +257,12 @@ function validateFinance(){
   const e={}; [["availableFunds","가용 자금"],["monthlyIncome","월 소득"],["fixedExpenses","월 고정지출"],["minimumFunds","최소 보유 자금"]].forEach(([k,l])=>{if(state.finance[k]==="")e[k]=l+"을 입력해주세요."}); return e
 }
 function validateHousing(){
-  const e={}; if(!state.housing.name.trim())e.name="이름을 입력해주세요."; if(state.housing.deposit==="")e.deposit="보증금을 입력해주세요."; if(state.housing.transactionType==="monthlyRent"&&state.housing.monthlyRent==="")e.monthlyRent="월세를 입력해주세요."; return e
+  const e={};
+  if(!state.housing.name.trim()) e.name="이름을 입력해주세요.";
+  else if(isDuplicateConditionName(state.housing.name)) e.name="이미 저장한 조건 이름이에요. 다른 이름으로 구분해주세요.";
+  if(state.housing.deposit==="") e.deposit="보증금을 입력해주세요.";
+  if(state.housing.transactionType==="monthlyRent"&&state.housing.monthlyRent==="") e.monthlyRent="월세를 입력해주세요.";
+  return e
 }
 function snapshot(){
   const old=list().find(x=>x.id===state.editingId);
@@ -309,7 +319,16 @@ function bind(){
   document.querySelectorAll("[data-cost]").forEach(b=>b.onclick=()=>{const [k,s]=b.dataset.cost.split(":");state.housing[k]={status:s,amount:s==="amount"?"":null};state.isDirty=!!state.editingId;render()});
   document.querySelectorAll("[data-cost-amount]").forEach(i=>i.oninput=e=>{const k=i.dataset.costAmount;state.housing[k].amount=sanitize(e.target.value);state.isDirty=!!state.editingId;e.target.value=formatInput(state.housing[k].amount)});
   $("[data-calc]")?.addEventListener("click",()=>{const e=validateHousing();document.querySelectorAll("[data-error]").forEach(x=>x.textContent=e[x.dataset.error]||"");if(Object.keys(e).length)return;state.lastResult=calculate(state.finance,state.housing);state.view="result";render()});
-  $("[data-save]")?.addEventListener("click",()=>{const item=snapshot(),a=list(),i=a.findIndex(x=>x.id===item.id);if(i>=0)a[i]=item;else a.unshift(item);saveList(a);state.editingId=item.id;state.isDirty=false;render()});
+  $("[data-save]")?.addEventListener("click",()=>{
+    if(isDuplicateConditionName(state.housing.name)){
+      state.view="housing";render();
+      const e=document.querySelector('[data-error="name"]');if(e)e.textContent="이미 저장한 조건 이름이에요. 다른 이름으로 구분해주세요.";
+      return;
+    }
+    const item=snapshot(),a=list(),i=a.findIndex(x=>x.id===item.id);
+    if(i>=0)a[i]=item;else a.unshift(item);
+    saveList(a);state.editingId=item.id;state.isDirty=false;render();
+  });
   $("[data-export-current]")?.addEventListener("click",()=>exportConditionImage({name:state.housing.name.trim(),transactionType:state.housing.transactionType,housing:structuredClone(state.housing),financeSnapshot:structuredClone(state.finance),results:calculate(state.finance,state.housing)}));
   $("[data-edit-housing]")?.addEventListener("click",()=>{state.view="housing";render()});
   $("[data-go-compare]")?.addEventListener("click",()=>{state.selected=state.editingId?[state.editingId]:[];state.view="saved";state.aiResult=null;render()});
