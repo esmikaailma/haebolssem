@@ -83,50 +83,68 @@ export default async function handler(req,res){
       JSON.stringify(deterministic)
     ].join("\n");
 
-    const controller=new AbortController();
-    const timeout=setTimeout(()=>controller.abort(),22000);
-    let gatewayResponse;
-    try{
-      gatewayResponse=await fetch("https://ai-gateway.vercel.sh/v1/chat/completions",{
-        method:"POST",
-        headers:{
-          "Authorization":"Bearer "+apiKey,
-          "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-          model:"google/gemini-3.5-flash-lite",
-          models:["alibaba/qwen3.5-flash"],
-          messages:[{role:"user",content:prompt}],
-          max_tokens:220,
-          temperature:0.1
-        }),
-        signal:controller.signal
-      });
-    }finally{
-      clearTimeout(timeout);
+    const models=["openai/gpt-4.1-nano","google/gemini-2.5-flash-lite"];
+    let lastFailure=null;
+
+    for(const model of models){
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),8000);
+      try{
+        const gatewayResponse=await fetch("https://ai-gateway.vercel.sh/v1/chat/completions",{
+          method:"POST",
+          headers:{
+            "Authorization":"Bearer "+apiKey,
+            "Content-Type":"application/json"
+          },
+          body:JSON.stringify({
+            model,
+            messages:[{role:"user",content:prompt}],
+            max_tokens:220,
+            temperature:0.1
+          }),
+          signal:controller.signal
+        });
+
+        const gatewayText=await gatewayResponse.text();
+        if(!gatewayResponse.ok){
+          console.error("AI_GATEWAY_HTTP_ERROR",model,gatewayResponse.status,gatewayText.slice(0,1000));
+          if([401,402,403,429].includes(gatewayResponse.status)){
+            const mapped=gatewayError(gatewayResponse.status,gatewayText);
+            return res.status(mapped.status).json({error:mapped.error});
+          }
+          lastFailure=new Error("GATEWAY_"+gatewayResponse.status);
+          continue;
+        }
+
+        let gatewayJson;
+        try{gatewayJson=JSON.parse(gatewayText)}catch{
+          console.error("AI_GATEWAY_NON_JSON",model,gatewayText.slice(0,1000));
+          lastFailure=new Error("GATEWAY_NON_JSON");
+          continue;
+        }
+
+        const raw=gatewayJson?.choices?.[0]?.message?.content||"";
+        const cleaned=String(raw).replace(/^\`\`\`json\s*/,"").replace(/\`\`\`\s*$/,"").trim();
+        try{
+          const parsed=JSON.parse(cleaned);
+          console.info("AI_COMPARE_MODEL",model);
+          return res.status(200).json(parsed);
+        }catch{
+          console.error("AI_RESPONSE_PARSE_FAILED",model,cleaned.slice(0,1000));
+          lastFailure=new Error("AI_RESPONSE_PARSE_FAILED");
+          continue;
+        }
+      }catch(e){
+        console.error("AI_MODEL_CALL_FAILED",model,e?.name||"",String(e?.message||e));
+        lastFailure=e;
+        continue;
+      }finally{
+        clearTimeout(timeout);
+      }
     }
 
-    const gatewayText=await gatewayResponse.text();
-    if(!gatewayResponse.ok){
-      console.error("AI_GATEWAY_HTTP_ERROR",gatewayResponse.status,gatewayText.slice(0,1000));
-      const mapped=gatewayError(gatewayResponse.status,gatewayText);
-      return res.status(mapped.status).json({error:mapped.error});
-    }
-
-    let gatewayJson;
-    try{gatewayJson=JSON.parse(gatewayText)}catch{
-      console.error("AI_GATEWAY_NON_JSON",gatewayText.slice(0,1000));
-      return res.status(502).json({error:"AI Gateway 응답 형식을 읽지 못했어요. 잠시 후 다시 시도해주세요."});
-    }
-
-    const raw=gatewayJson?.choices?.[0]?.message?.content||"";
-    const cleaned=String(raw).replace(/^\`\`\`json\s*/,"").replace(/\`\`\`\s*$/,"").trim();
-    let parsed;
-    try{parsed=JSON.parse(cleaned)}catch{
-      console.error("AI_RESPONSE_PARSE_FAILED",cleaned.slice(0,1000));
-      return res.status(502).json({error:"AI 응답을 정리하는 과정에서 오류가 발생했어요. 잠시 후 다시 시도해주세요."});
-    }
-    return res.status(200).json(parsed);
+    if(lastFailure?.name==="AbortError") return res.status(504).json({error:"AI 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요."});
+    return res.status(502).json({error:"AI 비교 응답을 불러오지 못했어요. 잠시 후 다시 시도해주세요."});
   }catch(e){
     console.error("AI_COMPARE_ERROR",e);
     if(e?.name==="AbortError") return res.status(504).json({error:"AI 응답이 지연되고 있어요. 다시 시도해주세요."});
