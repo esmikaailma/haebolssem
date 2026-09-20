@@ -419,7 +419,7 @@ async function askAI(){
   if(cached){state.aiResult=cached;render();return}
   const b=$("[data-ai]"); if(b){b.disabled=true;b.textContent="내 재정 기준으로 정리하는 중..."}
   try{
-    const r=await fetch("/api/compare",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scenarios:chosen})});
+    const r=await fetch("/api/compare",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({scenarios:chosen})});
     const raw=await r.text();
     let d;
     try{d=JSON.parse(raw)}catch{
