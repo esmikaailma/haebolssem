@@ -1,0 +1,8 @@
+{
+  "name": "haebolssem",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "ai": "latest"
+  }
+}
