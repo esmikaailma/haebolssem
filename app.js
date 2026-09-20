@@ -19,6 +19,27 @@ let state={
   housing:newHousing(),editingId:null,lastResult:null,selected:[],aiResult:null,isDirty:false,selectedMinPct:null
 };
 
+async function saveCanvasImage(canvas,filename,title){
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
+  if(!blob)return;
+  const file=new File([blob],filename,{type:"image/png"});
+  if(navigator.share&&navigator.canShare?.({files:[file]})){
+    try{
+      await navigator.share({files:[file],title});
+      return;
+    }catch(e){
+      if(e?.name==="AbortError")return;
+    }
+  }
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.download=filename;
+  a.href=url;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
 function row(label,val){return '<div class="row"><span>'+label+'</span><strong>'+val+'</strong></div>'}
 function signedMoney(v){return v>0?"+"+money(v):v<0?"-"+money(Math.abs(v)):money(0)}
 function diffStatusClass(v){return v>0?"status-positive":v<0?"status-negative":"status-neutral"}
@@ -95,7 +116,7 @@ function exportConditionImage(item){
   wrapText("주거비 반영 후 잔액에는 식비·교통비 등 변동 생활비가 포함되지 않습니다.",left,2070,right-left,28);
   ctx.fillStyle="#94a3b8";ctx.font="500 18px Pretendard, sans-serif";ctx.fillText("해볼셈 · 계산 결과",left,2130);
 
-  const a=document.createElement("a");a.download=(item.name||"해볼셈")+"-계산결과.png";a.href=canvas.toDataURL("image/png");a.click();
+  return saveCanvasImage(canvas,(item.name||"해볼셈")+"-계산결과.png","해볼셈 계산 결과");
 }
 
 function exportAIComparisonImage(chosen,aiResult){
@@ -166,7 +187,7 @@ function exportAIComparisonImage(chosen,aiResult){
   ctx.fillStyle="#6b7280";ctx.font="500 18px Pretendard, sans-serif";
   wrap("생활비 사용 가능 금액은 월 소득에서 월 고정지출과 확인된 월 주거비를 뺀 금액입니다. 식비·교통비·저축 등 실제 지출 전 기준입니다.",left,1990,maxWidth,27);
   ctx.fillStyle="#94a3b8";ctx.font="500 18px Pretendard, sans-serif";ctx.fillText("해볼셈 · AI 내 재정 기준 비교",left,2070);
-  const a=document.createElement("a");a.download="해볼셈-AI비교결과.png";a.href=canvas.toDataURL("image/png");a.click();
+  return saveCanvasImage(canvas,"해볼셈-AI비교결과.png","해볼셈 AI 비교 결과");
 }
 
 function field(k,label,helper){
@@ -343,7 +364,7 @@ function compare(){
 
   body+='<section class="section finance-ai-section"><h3>내 재정 기준 비교</h3><p class="muted">같은 재정 기준에서 각 조건의 월 주거비와 생활비 사용 가능 금액을 비교해요. 특정 조건을 추천하거나 순위를 매기지는 않아요.</p>';
   if(state.aiResult){
-    if(state.aiResult.error) body+='<div class="notice">'+escapeHtml(state.aiResult.error)+'</div>';
+    if(state.aiResult.error) body+='<div class="notice">'+escapeHtml(state.aiResult.error)+'</div><button class="btn primary ai-retry" data-ai>다시 시도하기</button>';
     else{
       body+='<div class="ai-summary-grid">'+chosen.map(item=>{
         const r=item.results;
