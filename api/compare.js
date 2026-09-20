@@ -1,6 +1,4 @@
 
-import { generateText } from "ai";
-
 const num=v=>Number(String(v??"").replaceAll(",",""))||0;
 const known=c=>c?.status==="amount"?num(c.amount):c?.status==="zero"?0:null;
 const unknownLabels=s=>{
@@ -8,31 +6,41 @@ const unknownLabels=s=>{
   return map.filter(([k])=>s.housing?.[k]?.status==="unknown").map(([,label])=>label);
 };
 const financeKey=f=>JSON.stringify({availableFunds:num(f.availableFunds),monthlyIncome:num(f.monthlyIncome),fixedExpenses:num(f.fixedExpenses),minimumFunds:num(f.minimumFunds)});
-const spread=(scenarios,fields)=>{
-  return fields.map(([key,label,kind])=>{
-    const values=scenarios.map(s=>{
-      if(key==="deposit") return num(s.housing.deposit);
-      if(key==="monthlyRent") return s.transactionType==="monthlyRent"?num(s.housing.monthlyRent):0;
-      const v=known(s.housing[key]); return v===null?null:v;
-    });
-    const knownValues=values.filter(v=>v!==null);
-    if(knownValues.length!==values.length||knownValues.length<2) return null;
-    return {label,kind,difference:Math.max(...knownValues)-Math.min(...knownValues)};
-  }).filter(Boolean).sort((a,b)=>b.difference-a.difference);
-};
+const spread=(scenarios,fields)=>fields.map(([key,label,kind])=>{
+  const values=scenarios.map(s=>{
+    if(key==="deposit") return num(s.housing.deposit);
+    if(key==="monthlyRent") return s.transactionType==="monthlyRent"?num(s.housing.monthlyRent):0;
+    const v=known(s.housing[key]);return v===null?null:v;
+  });
+  const knownValues=values.filter(v=>v!==null);
+  if(knownValues.length!==values.length||knownValues.length<2) return null;
+  return {label,kind,difference:Math.max(...knownValues)-Math.min(...knownValues)};
+}).filter(Boolean).sort((a,b)=>b.difference-a.difference);
+
+function gatewayError(status,text){
+  const msg=String(text||"");
+  if(/credit card|customer_verification_required/i.test(msg)) return {status:402,error:"AI Gateway 사용을 위해 Vercel에서 결제 카드 인증이 필요해요."};
+  if(/insufficient|credit|balance|payment method|billing/i.test(msg)) return {status:402,error:"AI Gateway 크레딧 또는 결제 설정을 확인해주세요."};
+  if(status===401) return {status:401,error:"AI Gateway API Key 인증에 실패했어요. Vercel Environment Variable의 AI_GATEWAY_API_KEY를 확인해주세요."};
+  if(status===403) return {status:403,error:"AI Gateway 접근이 거부됐어요. API Key의 팀/프로젝트 범위와 크레딧 활성화 상태를 확인해주세요."};
+  if(status===429) return {status:429,error:"AI 요청이 잠시 제한됐어요. 잠시 후 다시 시도해주세요."};
+  return {status:502,error:"AI Gateway 호출 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."};
+}
 
 export default async function handler(req,res){
   if(req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
   try{
-    if(!process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN){
-      return res.status(503).json({error:"AI Gateway 인증 정보가 Preview 환경에 적용되지 않았어요. AI_GATEWAY_API_KEY 환경변수와 Redeploy 여부를 확인해주세요."});
-    }
+    const apiKey=process.env.AI_GATEWAY_API_KEY;
+    if(!apiKey) return res.status(503).json({error:"AI_GATEWAY_API_KEY가 Preview 환경에 적용되지 않았어요. 환경변수 저장 후 Redeploy해주세요."});
+
     const scenarios=req.body?.scenarios||[];
     if(scenarios.length<2||scenarios.length>3) return res.status(400).json({error:"2~3개의 조건이 필요합니다."});
+
     const financeKeys=scenarios.map(s=>financeKey(s.financeSnapshot||{}));
-    if(!financeKeys.every(k=>k===financeKeys[0])) {
+    if(!financeKeys.every(k=>k===financeKeys[0])){
       return res.status(409).json({error:"선택한 조건의 계산 기준 재정이 서로 달라요. 같은 재정 기준으로 다시 계산한 뒤 비교해주세요."});
     }
+
     const f=scenarios[0].financeSnapshot;
     const scenarioFacts=scenarios.map(s=>({
       name:s.name,
@@ -58,6 +66,7 @@ export default async function handler(req,res){
       largestInitialDriver:drivers.find(x=>x.kind==="initial"&&x.difference>0)||null,
       largestMonthlyDriver:drivers.find(x=>x.kind==="monthly"&&x.difference>0)||null
     };
+
     const prompt=[
       "당신은 사용자가 직접 입력한 주거 조건을 사용자의 동일한 재정 기준에서 해석하는 보조자입니다.",
       "반드시 제공된 deterministicFacts만 사용하세요. 숫자를 새로 계산·추정·변경하지 마세요.",
@@ -70,19 +79,53 @@ export default async function handler(req,res){
       "deterministicFacts:",
       JSON.stringify(deterministic)
     ].join("\n");
-    const result=await generateText({model:"alibaba/qwen3.5-flash",prompt,maxOutputTokens:320});
-    const raw=result.text||"";
-    const cleaned=raw.replace(/^\`\`\`json\s*/,"").replace(/\`\`\`\s*$/,"").trim();
+
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),18000);
+    let gatewayResponse;
+    try{
+      gatewayResponse=await fetch("https://ai-gateway.vercel.sh/v1/chat/completions",{
+        method:"POST",
+        headers:{
+          "Authorization":"Bearer "+apiKey,
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          model:"alibaba/qwen3.5-flash",
+          messages:[{role:"user",content:prompt}],
+          max_tokens:320,
+          temperature:0.2
+        }),
+        signal:controller.signal
+      });
+    }finally{
+      clearTimeout(timeout);
+    }
+
+    const gatewayText=await gatewayResponse.text();
+    if(!gatewayResponse.ok){
+      console.error("AI_GATEWAY_HTTP_ERROR",gatewayResponse.status,gatewayText.slice(0,1000));
+      const mapped=gatewayError(gatewayResponse.status,gatewayText);
+      return res.status(mapped.status).json({error:mapped.error});
+    }
+
+    let gatewayJson;
+    try{gatewayJson=JSON.parse(gatewayText)}catch{
+      console.error("AI_GATEWAY_NON_JSON",gatewayText.slice(0,1000));
+      return res.status(502).json({error:"AI Gateway 응답 형식을 읽지 못했어요. 잠시 후 다시 시도해주세요."});
+    }
+
+    const raw=gatewayJson?.choices?.[0]?.message?.content||"";
+    const cleaned=String(raw).replace(/^\`\`\`json\s*/,"").replace(/\`\`\`\s*$/,"").trim();
     let parsed;
-    try{parsed=JSON.parse(cleaned)}catch{throw new Error("AI_RESPONSE_PARSE_FAILED")}
+    try{parsed=JSON.parse(cleaned)}catch{
+      console.error("AI_RESPONSE_PARSE_FAILED",cleaned.slice(0,1000));
+      return res.status(502).json({error:"AI 응답을 정리하는 과정에서 오류가 발생했어요. 잠시 후 다시 시도해주세요."});
+    }
     return res.status(200).json(parsed);
   }catch(e){
     console.error("AI_COMPARE_ERROR",e);
-    const message=String(e?.message||e||"");
-    if(message.includes("AI_RESPONSE_PARSE_FAILED")) return res.status(502).json({error:"AI 응답을 정리하는 과정에서 오류가 발생했어요. 잠시 후 다시 시도해주세요."});
-    if(/credit card|customer_verification_required/i.test(message)) return res.status(402).json({error:"AI Gateway 사용을 위해 Vercel에서 결제 카드 인증이 필요해요. 카드를 등록한 뒤 AI Gateway 크레딧 상태를 확인해주세요."});
-    if(/insufficient|credit|balance|payment method|billing/i.test(message)) return res.status(402).json({error:"AI Gateway 크레딧 또는 결제 설정을 확인해주세요."});
-    if(/403|forbidden|access_denied/i.test(message)) return res.status(403).json({error:"AI Gateway 접근이 거부됐어요. API Key의 팀/프로젝트 범위와 크레딧 활성화 상태를 확인해주세요."});
-    return res.status(500).json({error:"AI 비교 기능을 불러오지 못했어요. Vercel Runtime Logs에서 AI_COMPARE_ERROR를 확인해주세요."});
+    if(e?.name==="AbortError") return res.status(504).json({error:"AI 응답 시간이 길어 요청이 종료됐어요. 다시 시도해주세요."});
+    return res.status(500).json({error:"AI 비교 기능 실행 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."});
   }
 }
