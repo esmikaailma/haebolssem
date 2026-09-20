@@ -93,7 +93,7 @@ export default async function handler(req,res){
         body:JSON.stringify({
           model:"alibaba/qwen3.5-flash",
           messages:[{role:"user",content:prompt}],
-          max_tokens:220,
+          max_tokens:280,
           temperature:0.1,
           reasoning:{effort:"none"}
         }),
