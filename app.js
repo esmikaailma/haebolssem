@@ -22,8 +22,9 @@ let state={
 async function saveCanvasImage(canvas,filename,title){
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
   if(!blob)return;
+  const mobileLike=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/i.test(navigator.userAgent));
   const file=new File([blob],filename,{type:"image/png"});
-  if(navigator.share&&navigator.canShare?.({files:[file]})){
+  if(mobileLike&&navigator.share&&navigator.canShare?.({files:[file]})){
     try{
       await navigator.share({files:[file],title});
       return;
