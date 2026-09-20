@@ -160,7 +160,7 @@ function exportAIComparisonImage(chosen,aiResult){
     dash(y);y+=44;
     ctx.fillStyle="#111827";ctx.font="800 25px Pretendard, sans-serif";ctx.fillText("확인할 점",left,y);y+=38;
     ctx.fillStyle="#9a3412";ctx.font="500 19px Pretendard, sans-serif";
-    checks.forEach(t=>{y=wrap("• "+t,left,y,maxWidth,28)+10});
+    checks.forEach(t=>{y=wrap("• "+t,left,y,maxWidth,28)+38});
   }
 
   ctx.fillStyle="#6b7280";ctx.font="500 18px Pretendard, sans-serif";
@@ -271,6 +271,12 @@ function compare(){
   if(chosen.length<2) return '<div class="empty">비교할 조건을 2개 이상 선택해주세요.</div>';
   const sameFinance=chosen.every(x=>JSON.stringify(x.financeSnapshot)===JSON.stringify(chosen[0].financeSnapshot));
   const groups=[
+    {title:"재정 기준",rows:[
+      ["가용 자금",x=>money(num(x.financeSnapshot.availableFunds))],
+      ["월 소득",x=>money(num(x.financeSnapshot.monthlyIncome))],
+      ["월 고정지출",x=>money(num(x.financeSnapshot.fixedExpenses))],
+      ["최소 보유 자금",x=>money(num(x.financeSnapshot.minimumFunds))]
+    ]},
     {title:"주거 조건",rows:[
       ["거래 유형",x=>x.transactionType==="monthlyRent"?"월세":"전세"],
       ["보증금",x=>money(num(x.housing.deposit))],
@@ -295,7 +301,7 @@ function compare(){
     ]}
   ];
   let body='<h2>비교</h2><p class="muted">초기 부담과 매달 부담의 차이를 함께 확인하세요.</p>';
-  if(!sameFinance) body+='<div class="notice">선택한 조건의 계산 기준 재정이 서로 다릅니다. 같은 재정 기준으로 다시 계산한 뒤 AI 비교를 사용할 수 있어요.</div>';
+  if(!sameFinance) body+='<div class="notice">선택한 조건의 계산 기준 재정이 서로 다릅니다. 아래 재정 기준의 차이를 확인한 뒤 같은 기준으로 다시 계산하면 AI 비교를 사용할 수 있어요.</div>';
   body+='<div class="compare-desktop"><section class="section"><div class="table-wrap"><table><thead><tr><th>항목</th>'+chosen.map(x=>'<th>'+escapeHtml(x.name)+'</th>').join("")+'</tr></thead><tbody>';
   groups.forEach(group=>{
     body+='<tr class="group-row"><td colspan="'+(chosen.length+1)+'">'+group.title+'</td></tr>';
