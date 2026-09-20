@@ -194,7 +194,7 @@ function compare(){
   groups.forEach(group=>{
     body+='<section class="compare-section"><h3>'+group.title+'</h3>';
     group.rows.forEach(([label,fn])=>{
-      body+='<div class="compare-metric"><div class="compare-metric-label">'+label+'</div><div class="compare-columns">'+chosen.map(x=>'<div class="compare-column"><span>'+escapeHtml(x.name)+'</span><strong>'+fn(x)+'</strong></div>').join("")+'</div></div>';
+      body+='<div class="compare-metric"><div class="compare-metric-label">'+label+'</div><div class="compare-columns" style="grid-template-columns:repeat('+chosen.length+',minmax(0,1fr))">'+chosen.map(x=>'<div class="compare-column"><span>'+escapeHtml(x.name)+'</span><strong>'+fn(x)+'</strong></div>').join("")+'</div></div>';
     });
     body+='</section>';
   });
