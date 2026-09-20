@@ -22,20 +22,31 @@ function knownFormulaParts(h,keys){return keys.map(([k,label])=>[label,costDispl
 function calcLine(label,formula,result,note=""){return '<div class="calc-line"><div class="calc-line-title">'+label+'</div><div class="calc-formula">'+formula+'</div><strong>'+result+'</strong>'+(note?'<div class="helper">'+note+'</div>':'')+'</div>'}
 function exportConditionImage(item){
   const r=item.results;
+  const unknown=[...unknownLabels(item.housing,OPTIONAL_INITIAL),...unknownLabels(item.housing,OPTIONAL_MONTHLY)];
   const canvas=document.createElement("canvas");
-  canvas.width=1080;canvas.height=1880;
+  canvas.width=1080;canvas.height=2100;
   const ctx=canvas.getContext("2d");
   const left=104,right=976;
-  ctx.fillStyle="#f8fafc";ctx.fillRect(0,0,1080,1880);
-  ctx.fillStyle="#ffffff";ctx.fillRect(54,54,972,1772);
-  ctx.fillStyle="#2563eb";ctx.font="800 30px Pretendard, sans-serif";ctx.fillText("해볼셈",left,118);
-  ctx.fillStyle="#111827";ctx.font="800 48px Pretendard, sans-serif";ctx.fillText(item.name||"주거 조건",left,192);
-  ctx.fillStyle="#6b7280";ctx.font="500 25px Pretendard, sans-serif";ctx.fillText((item.transactionType==="monthlyRent"?"월세":"전세")+" · 독립 비용 계산 결과",left,236);
-  const dash=(y)=>{ctx.strokeStyle="#cbd5e1";ctx.setLineDash([10,10]);ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(right,y);ctx.stroke();ctx.setLineDash([])};
+  ctx.fillStyle="#f8fafc";ctx.fillRect(0,0,1080,2100);
+  ctx.fillStyle="#ffffff";ctx.fillRect(54,54,972,1992);
+  const dash=y=>{ctx.strokeStyle="#cbd5e1";ctx.setLineDash([10,10]);ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(right,y);ctx.stroke();ctx.setLineDash([])};
   const valueRow=(label,value,y,color="#111827")=>{
     ctx.fillStyle="#6b7280";ctx.font="600 23px Pretendard, sans-serif";ctx.textAlign="left";ctx.fillText(label,left,y);
     ctx.fillStyle=color;ctx.font="800 31px Pretendard, sans-serif";ctx.textAlign="right";ctx.fillText(value,right,y);ctx.textAlign="left";
   };
+  const wrapText=(text,x,y,maxWidth,lineHeight)=>{
+    const words=String(text).split(" ");let line="";let cursor=y;
+    words.forEach(word=>{
+      const test=line?line+" "+word:word;
+      if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,cursor);line=word;cursor+=lineHeight}
+      else line=test;
+    });
+    if(line)ctx.fillText(line,x,cursor);
+    return cursor;
+  };
+  ctx.fillStyle="#2563eb";ctx.font="800 30px Pretendard, sans-serif";ctx.fillText("해볼셈",left,118);
+  ctx.fillStyle="#111827";ctx.font="800 48px Pretendard, sans-serif";ctx.fillText(item.name||"주거 조건",left,192);
+  ctx.fillStyle="#6b7280";ctx.font="500 25px Pretendard, sans-serif";ctx.fillText((item.transactionType==="monthlyRent"?"월세":"전세")+" · 독립 비용 계산 결과",left,236);
   dash(286);
   ctx.fillStyle="#111827";ctx.font="800 27px Pretendard, sans-serif";ctx.fillText("핵심 결과",left,334);
   valueRow("초기 필요 자금",(r.initialUnknown?"최소 ":"")+money(r.initialKnown),390);
@@ -53,24 +64,29 @@ function exportConditionImage(item){
   ctx.fillStyle="#374151";ctx.font="700 22px Pretendard, sans-serif";ctx.fillText("초기 비용",left,y);y+=42;
   smallRow("보증금",money(num(item.housing.deposit)));
   OPTIONAL_INITIAL.forEach(([k,label])=>smallRow(label,costDisplay(item.housing[k])));
-  y+=10;valueRow("초기 필요 자금",(r.initialUnknown?"최소 ":"")+money(r.initialKnown),y);y+=60;
+  y+=8;valueRow("초기 필요 자금",(r.initialUnknown?"최소 ":"")+money(r.initialKnown),y);y+=62;
   ctx.fillStyle="#374151";ctx.font="700 22px Pretendard, sans-serif";ctx.fillText("월 주거비",left,y);y+=42;
   if(item.transactionType==="monthlyRent") smallRow("월세",money(num(item.housing.monthlyRent)));
   OPTIONAL_MONTHLY.forEach(([k,label])=>smallRow(label,costDisplay(item.housing[k])));
-  y+=10;valueRow("월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown),y);y+=66;
+  y+=8;valueRow("월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown),y);y+=70;
   dash(y);y+=50;
-  ctx.fillStyle="#374151";ctx.font="700 22px Pretendard, sans-serif";ctx.fillText("재정 기준",left,y);y+=42;
+  ctx.fillStyle="#111827";ctx.font="800 27px Pretendard, sans-serif";ctx.fillText("재정 기준",left,y);y+=46;
   smallRow("가용 자금",money(num(item.financeSnapshot.availableFunds)));
   smallRow("월 소득",money(num(item.financeSnapshot.monthlyIncome)));
   smallRow("월 고정지출",money(num(item.financeSnapshot.fixedExpenses)));
   smallRow("최소 보유 자금",money(num(item.financeSnapshot.minimumFunds)));
-  const unknown=[...unknownLabels(item.housing,OPTIONAL_INITIAL),...unknownLabels(item.housing,OPTIONAL_MONTHLY)];
   if(unknown.length){
-    y+=18;ctx.fillStyle="#9a3412";ctx.font="600 21px Pretendard, sans-serif";ctx.fillText("미확인 비용: "+unknown.join(", "),left,y);
+    y+=18;dash(y);y+=48;
+    ctx.fillStyle="#9a3412";ctx.font="800 24px Pretendard, sans-serif";ctx.fillText("미확인 비용",left,y);y+=42;
+    ctx.font="600 21px Pretendard, sans-serif";
+    unknown.forEach(label=>{ctx.fillText("• "+label,left,y);y+=34});
+    ctx.fillStyle="#7c2d12";ctx.font="500 19px Pretendard, sans-serif";
+    y=wrapText("미확인 비용은 0원으로 처리하지 않고 합계에서 제외했어요. 비용 합계는 최소값, 잔액은 최대값으로 표시됩니다.",left,y+8,right-left,29)+35;
   }
+  dash(y);y+=48;
   ctx.fillStyle="#6b7280";ctx.font="500 19px Pretendard, sans-serif";
-  ctx.fillText("주거비 반영 후 잔액에는 식비·교통비 등 변동 생활비가 포함되지 않습니다.",left,1730);
-  ctx.fillStyle="#94a3b8";ctx.font="500 18px Pretendard, sans-serif";ctx.fillText("해볼셈 · 계산 결과",left,1780);
+  y=wrapText("주거비 반영 후 잔액에는 식비·교통비 등 변동 생활비가 포함되지 않습니다.",left,y,right-left,28);
+  ctx.fillStyle="#94a3b8";ctx.font="500 18px Pretendard, sans-serif";ctx.fillText("해볼셈 · 계산 결과",left,1990);
   const a=document.createElement("a");a.download=(item.name||"해볼셈")+"-계산결과.png";a.href=canvas.toDataURL("image/png");a.click();
 }
 function field(k,label,helper){
@@ -93,6 +109,7 @@ function finance(){
   field("monthlyIncome","월 소득","수입이 일정하지 않다면 최근 1년간 평균 월 소득을 입력하세요.")+
   field("fixedExpenses","월 고정지출","독립 후에도 계속 발생하는 대출 상환·보험료·통신비·정기 구독료 등을 합산해 입력하세요.")+
   field("minimumFunds","최소 보유 자금","독립 비용을 지출한 뒤에도 최소한 남겨두고 싶은 자금을 입력하세요.")+
+  '<div class="quick-set"><div class="helper">가용 자금 기준 빠른 설정</div><div class="quick-set-buttons"><button type="button" data-min-pct="10">10%</button><button type="button" data-min-pct="20">20%</button><button type="button" data-min-pct="30">30%</button></div></div>'+
   '</section><div class="actions"><button class="btn primary" data-next-finance>다음</button><button class="btn ghost" data-go="home">취소</button></div>'
 }
 function housing(){
@@ -123,7 +140,14 @@ function result(){
   const monthlyUnknownNames=unknownLabels(state.housing,OPTIONAL_MONTHLY);
   const allUnknown=[...initialUnknownNames,...monthlyUnknownNames];
   const detailCard=(label,value,note,content,klass="")=>'<details class="result-detail-card '+klass+'"><summary><div><div class="label">'+label+'</div><div class="value">'+value+'</div>'+(note?'<div class="note">'+note+'</div>':'')+'</div><span class="detail-toggle">계산 내역</span></summary><div class="result-detail-body">'+content+'</div></details>';
-  let body='<h2>'+escapeHtml(state.housing.name)+'</h2><p class="muted">'+(state.housing.transactionType==="monthlyRent"?"월세":"전세")+' 조건 계산 결과</p>';
+  const savedCount=list().length;
+  let body='<h2>'+escapeHtml(state.housing.name)+'</h2><p class="muted">'+(state.housing.transactionType==="monthlyRent"?"월세":"전세")+' 조건 계산 결과</p>'+
+  '<section class="finance-summary"><div class="finance-summary-title">재정 기준</div><div class="finance-summary-grid">'+
+    '<div><span>가용 자금</span><strong>'+money(num(state.finance.availableFunds))+'</strong></div>'+
+    '<div><span>월 소득</span><strong>'+money(num(state.finance.monthlyIncome))+'</strong></div>'+
+    '<div><span>월 고정지출</span><strong>'+money(num(state.finance.fixedExpenses))+'</strong></div>'+
+    '<div><span>최소 보유 자금</span><strong>'+money(num(state.finance.minimumFunds))+'</strong></div>'+
+  '</div></section>';
   if(allUnknown.length) body+='<div class="notice"><strong>미확인 비용: '+allUnknown.map(escapeHtml).join(", ")+'</strong><br>해당 비용은 0원으로 처리하지 않고 합계에서 제외했습니다. 비용은 최소값, 잔액은 최대값으로 표시됩니다.</div>';
   const initialBreakdown=row("보증금",money(num(state.housing.deposit)))+OPTIONAL_INITIAL.map(([k,l])=>row(l,costDisplay(state.housing[k]))).join("")+
     row("확인된 비용 합계",(r.initialUnknown?"최소 ":"")+money(r.initialKnown))+
@@ -141,7 +165,13 @@ function result(){
     detailCard("월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown),monthlyUnknownNames.length?"미확인: "+monthlyUnknownNames.join(", "):"",monthlyBreakdown)+
     detailCard("주거비 반영 후 잔액",(r.monthlyUnknown?"최대 ":"")+money(r.monthlyBalance),"식비·교통비 등 변동 생활비는 포함되지 않았어요.",monthlyBalanceBreakdown)+
   '</section>';
-  body+='<div class="actions"><button class="btn primary" data-save '+(saved?"disabled":"")+'>'+saveLabel+'</button><button class="btn secondary" data-export-current>결과 이미지로 저장</button><button class="btn secondary" data-edit-housing>주거 조건 변경</button><button class="btn secondary" data-go="finance">내 재정 변경</button><button class="btn ghost" data-new>다른 조건 계산</button><button class="btn ghost" data-go="saved">저장 내역 보기</button></div>';
+  if(saved){
+    body+='<div class="saved-status">✓ 저장됨</div><div class="actions">'+
+      (savedCount>=2?'<button class="btn primary" data-go-compare>저장한 조건 비교하기</button>':'<button class="btn primary" data-new>다른 조건 추가해 비교하기</button>')+
+      '<button class="btn secondary" data-export-current>결과 이미지로 저장</button><button class="btn secondary" data-edit-housing>주거 조건 변경</button><button class="btn secondary" data-go="finance">내 재정 변경</button><button class="btn ghost" data-go="saved">저장 내역 보기</button></div>';
+  }else{
+    body+='<div class="compare-hint">이 결과를 저장하면 다른 주거 조건과 비교할 수 있어요.</div><div class="actions"><button class="btn primary" data-save>'+saveLabel+'</button><button class="btn secondary" data-export-current>결과 이미지로 저장</button><button class="btn secondary" data-edit-housing>주거 조건 변경</button><button class="btn secondary" data-go="finance">내 재정 변경</button><button class="btn ghost" data-new>다른 조건 계산</button><button class="btn ghost" data-go="saved">저장 내역 보기</button></div>';
+  }
   return body
 }
 function saved(){
@@ -230,12 +260,17 @@ function openCalc(id,edit){
   const x=list().find(v=>v.id===id); if(!x)return; state.finance=structuredClone(x.financeSnapshot);state.housing=structuredClone(x.housing);state.lastResult=x.results;state.editingId=x.id;state.isDirty=edit;state.view=edit?"housing":"result";render()
 }
 async function askAI(){
-  const chosen=list().filter(x=>state.selected.includes(x.id)); const b=$("[data-ai]"); if(b){b.disabled=true;b.textContent="내 재정 기준으로 정리하는 중..."}
+  const chosen=list().filter(x=>state.selected.includes(x.id));
+  const cacheKey=chosen.map(x=>x.id+":"+x.updatedAt).sort().join("|");
+  const cached=(load(KEY.ai)||{})[cacheKey];
+  if(cached){state.aiResult=cached;render();return}
+  const b=$("[data-ai]"); if(b){b.disabled=true;b.textContent="내 재정 기준으로 정리하는 중..."}
   try{
     const r=await fetch("/api/compare",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scenarios:chosen})});
     const d=await r.json();
     if(!r.ok) throw new Error(d.error||"재정 기준 비교를 불러오지 못했습니다.");
     state.aiResult=d;
+    const cache=load(KEY.ai)||{};cache[cacheKey]=d;save(KEY.ai,cache);
   }catch(e){
     state.aiResult={error:e.message};
   }
@@ -248,6 +283,13 @@ function bind(){
   document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{state.view=b.dataset.go;state.aiResult=null;render()});
   document.querySelectorAll("[data-start]").forEach(b=>b.onclick=()=>{state.view="finance";state.editingId=null;state.housing=newHousing();state.isDirty=false;render()});
   document.querySelectorAll("[data-finance]").forEach(i=>i.oninput=e=>{state.finance[i.dataset.finance]=sanitize(e.target.value);state.isDirty=!!state.editingId;e.target.value=formatInput(state.finance[i.dataset.finance])});
+  document.querySelectorAll("[data-min-pct]").forEach(b=>b.onclick=()=>{
+    if(state.finance.availableFunds===""){
+      const e=document.querySelector('[data-error="minimumFunds"]');if(e)e.textContent="가용 자금을 먼저 입력해주세요.";return;
+    }
+    state.finance.minimumFunds=String(Math.round(num(state.finance.availableFunds)*Number(b.dataset.minPct)/100));
+    state.isDirty=!!state.editingId;render();
+  });
   $("[data-next-finance]")?.addEventListener("click",()=>{const e=validateFinance();document.querySelectorAll("[data-error]").forEach(x=>x.textContent=e[x.dataset.error]||"");if(Object.keys(e).length)return;save(KEY.finance,state.finance);state.view="housing";render()});
   document.querySelectorAll("[data-type]").forEach(b=>b.onclick=()=>{state.housing.transactionType=b.dataset.type;state.isDirty=!!state.editingId;if(b.dataset.type==="jeonse")state.housing.monthlyRent="";render()});
   document.querySelectorAll("[data-housing]").forEach(i=>i.oninput=e=>{const k=i.dataset.housing;state.housing[k]=k==="name"?e.target.value:sanitize(e.target.value);state.isDirty=!!state.editingId;if(k!=="name")e.target.value=formatInput(state.housing[k])});
@@ -257,6 +299,7 @@ function bind(){
   $("[data-save]")?.addEventListener("click",()=>{const item=snapshot(),a=list(),i=a.findIndex(x=>x.id===item.id);if(i>=0)a[i]=item;else a.unshift(item);saveList(a);state.editingId=item.id;state.isDirty=false;render()});
   $("[data-export-current]")?.addEventListener("click",()=>exportConditionImage({name:state.housing.name.trim(),transactionType:state.housing.transactionType,housing:structuredClone(state.housing),financeSnapshot:structuredClone(state.finance),results:calculate(state.finance,state.housing)}));
   $("[data-edit-housing]")?.addEventListener("click",()=>{state.view="housing";render()});
+  $("[data-go-compare]")?.addEventListener("click",()=>{state.selected=state.editingId?[state.editingId]:[];state.view="saved";state.aiResult=null;render()});
   document.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>{state.housing=newHousing();state.editingId=null;state.lastResult=null;state.isDirty=false;state.view="housing";render()});
   document.querySelectorAll("[data-select]").forEach(i=>i.onchange=e=>{const id=i.dataset.select;if(e.target.checked&&!state.selected.includes(id)){if(state.selected.length>=3){alert("비교는 최대 3개까지 가능해요.");return render()}state.selected.push(id)}else state.selected=state.selected.filter(x=>x!==id);render()});
   document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openCalc(b.dataset.open,false));
