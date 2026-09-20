@@ -17,6 +17,42 @@ let state={
 function row(label,val){return '<div class="row"><span>'+label+'</span><strong>'+val+'</strong></div>'}
 function shell(body){return '<main class="app-shell"><div class="topbar"><button class="link-btn brand" data-go="home">해볼셈</button><button class="link-btn" data-go="saved">저장 내역</button></div>'+body+'</main>'}
 function metric(label,val,note){return '<div class="metric"><div class="label">'+label+'</div><div class="value">'+val+'</div>'+(note?'<div class="note">'+note+'</div>':'')+'</div>'}
+function exportConditionImage(item){
+  const r=item.results;
+  const canvas=document.createElement("canvas");
+  canvas.width=1080; canvas.height=1420;
+  const ctx=canvas.getContext("2d");
+  ctx.fillStyle="#f8fafc";ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="#ffffff";ctx.fillRect(64,64,952,1292);
+  ctx.fillStyle="#2563eb";ctx.font="700 30px Pretendard, sans-serif";ctx.fillText("해볼셈",112,128);
+  ctx.fillStyle="#111827";ctx.font="800 52px Pretendard, sans-serif";ctx.fillText(item.name||"주거 조건",112,210);
+  ctx.fillStyle="#6b7280";ctx.font="500 26px Pretendard, sans-serif";ctx.fillText(item.transactionType==="monthlyRent"?"월세":"전세",112,255);
+  const lines=[
+    ["초기 필요 자금",(r.initialUnknown?"최소 ":"")+money(r.initialKnown)],
+    ["초기 비용 후 잔액",(r.initialUnknown?"최대 ":"")+money(r.initialBalance)],
+    ["최소 보유 자금 대비",(r.minDiff>=0?"+":"-")+money(Math.abs(r.minDiff))],
+    ["월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown)],
+    ["주거비 반영 후 잔액",(r.monthlyUnknown?"최대 ":"")+money(r.monthlyBalance)]
+  ];
+  let y=350;
+  lines.forEach(([label,value])=>{
+    ctx.fillStyle="#6b7280";ctx.font="600 25px Pretendard, sans-serif";ctx.fillText(label,112,y);
+    ctx.fillStyle="#111827";ctx.font="800 38px Pretendard, sans-serif";ctx.textAlign="right";ctx.fillText(value,968,y+4);ctx.textAlign="left";
+    ctx.strokeStyle="#e5e7eb";ctx.beginPath();ctx.moveTo(112,y+42);ctx.lineTo(968,y+42);ctx.stroke();
+    y+=145;
+  });
+  ctx.fillStyle="#6b7280";ctx.font="500 22px Pretendard, sans-serif";
+  ctx.fillText("주거비 반영 후 잔액에는 식비·교통비 등 변동 생활비가 포함되지 않습니다.",112,1135);
+  if(r.initialUnknown||r.monthlyUnknown){
+    ctx.fillStyle="#9a3412";ctx.font="600 22px Pretendard, sans-serif";
+    ctx.fillText("미확인 비용이 있어 현재 확인된 금액 기준으로 표시했습니다.",112,1185);
+  }
+  ctx.fillStyle="#94a3b8";ctx.font="500 20px Pretendard, sans-serif";ctx.fillText("haebolssem",112,1285);
+  const a=document.createElement("a");
+  a.download=(item.name||"해볼셈")+"-계산결과.png";
+  a.href=canvas.toDataURL("image/png");
+  a.click();
+}
 function field(k,label,helper){
   return '<div class="field"><label>'+label+'</label><div class="input-wrap"><input inputmode="numeric" data-finance="'+k+'" value="'+formatInput(state.finance[k])+'" placeholder="0"><span>원</span></div><div class="helper">'+helper+'</div><div class="error" data-error="'+k+'"></div></div>'
 }
@@ -73,7 +109,7 @@ function result(){
   '</section>';
   body+='<section class="section"><h3>초기 비용 상세</h3><div class="card breakdown">'+row("보증금",money(num(state.housing.deposit)))+OPTIONAL_INITIAL.map(([k,l])=>row(l,costDisplay(state.housing[k]))).join("")+'</div></section>';
   body+='<section class="section"><h3>월 주거비 상세</h3><div class="card breakdown">'+row("월세",state.housing.transactionType==="monthlyRent"?money(num(state.housing.monthlyRent)):"—")+OPTIONAL_MONTHLY.map(([k,l])=>row(l,costDisplay(state.housing[k]))).join("")+'</div></section>';
-  body+='<div class="actions"><button class="btn primary" data-save '+(saved?"disabled":"")+'>'+(saved?"저장 완료":"저장하기")+'</button><button class="btn secondary" data-edit-housing>주거 조건 변경</button><button class="btn secondary" data-go="finance">내 재정 변경</button><button class="btn ghost" data-new>다른 조건 계산</button><button class="btn ghost" data-go="saved">저장 내역 보기</button></div>';
+  body+='<div class="actions"><button class="btn primary" data-save '+(saved?"disabled":"")+'>'+(saved?"저장 완료":"저장하기")+'</button><button class="btn secondary" data-export-current>결과 이미지로 저장</button><button class="btn secondary" data-edit-housing>주거 조건 변경</button><button class="btn secondary" data-go="finance">내 재정 변경</button><button class="btn ghost" data-new>다른 조건 계산</button><button class="btn ghost" data-go="saved">저장 내역 보기</button></div>';
   return body
 }
 function saved(){
@@ -83,21 +119,52 @@ function saved(){
     const r=x.results;
     return '<div class="card saved-card"><div class="saved-head"><div><h3>'+escapeHtml(x.name)+'</h3><div class="muted">'+(x.transactionType==="monthlyRent"?"월세":"전세")+'</div></div><input class="check" type="checkbox" data-select="'+x.id+'" '+(state.selected.includes(x.id)?"checked":"")+'></div>'+
     row("초기 필요 자금",(r.initialUnknown?"최소 ":"")+money(r.initialKnown))+row("초기 비용 후 잔액",(r.initialUnknown?"최대 ":"")+money(r.initialBalance))+row("월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown))+row("주거비 반영 후 잔액",(r.monthlyUnknown?"최대 ":"")+money(r.monthlyBalance))+
-    '<div class="actions"><button class="btn secondary" data-open="'+x.id+'">결과 보기</button><button class="btn ghost" data-edit="'+x.id+'">주거 조건 변경</button><button class="btn ghost" data-delete="'+x.id+'">삭제</button></div></div>'
+    '<div class="actions"><button class="btn secondary" data-open="'+x.id+'">결과 보기</button><button class="btn secondary" data-export="'+x.id+'">이미지 저장</button><button class="btn ghost" data-edit="'+x.id+'">주거 조건 변경</button><button class="btn ghost" data-delete="'+x.id+'">삭제</button></div></div>'
   }).join("")+'</div><div class="actions"><button class="btn primary" data-compare '+(state.selected.length<2?"disabled":"")+'>선택한 조건 비교 ('+state.selected.length+')</button><button class="btn secondary" data-new>다른 조건 계산</button></div>'
 }
 function compare(){
   const chosen=list().filter(x=>state.selected.includes(x.id));
   if(chosen.length<2) return '<div class="empty">비교할 조건을 2개 이상 선택해주세요.</div>';
-  const rows=[
-    ["거래 유형",x=>x.transactionType==="monthlyRent"?"월세":"전세"],["보증금",x=>money(num(x.housing.deposit))],["월세",x=>x.transactionType==="monthlyRent"?money(num(x.housing.monthlyRent)):"—"],
-    ["관리비",x=>costDisplay(x.housing.managementFee)],["주차비",x=>costDisplay(x.housing.parkingFee)],["인터넷",x=>costDisplay(x.housing.internet)],["기타 월 주거비",x=>costDisplay(x.housing.otherMonthly)],
-    ["중개보수",x=>costDisplay(x.housing.brokerageFee)],["이사비",x=>costDisplay(x.housing.movingFee)],["입주 청소비",x=>costDisplay(x.housing.cleaningFee)],["기타 초기 비용",x=>costDisplay(x.housing.otherInitial)],
-    ["초기 필요 자금",x=>(x.results.initialUnknown?"최소 ":"")+money(x.results.initialKnown)],["초기 비용 후 잔액",x=>(x.results.initialUnknown?"최대 ":"")+money(x.results.initialBalance)],
-    ["최소 보유 자금 대비",x=>(x.results.minDiff>=0?"+":"-")+money(Math.abs(x.results.minDiff))],["월 주거비",x=>(x.results.monthlyUnknown?"최소 ":"")+money(x.results.monthlyKnown)],["주거비 반영 후 잔액",x=>(x.results.monthlyUnknown?"최대 ":"")+money(x.results.monthlyBalance)]
+  const groups=[
+    {title:"주거 조건",rows:[
+      ["거래 유형",x=>x.transactionType==="monthlyRent"?"월세":"전세"],
+      ["보증금",x=>money(num(x.housing.deposit))],
+      ["월세",x=>x.transactionType==="monthlyRent"?money(num(x.housing.monthlyRent)):"—"],
+      ["관리비",x=>costDisplay(x.housing.managementFee)],
+      ["주차비",x=>costDisplay(x.housing.parkingFee)],
+      ["인터넷",x=>costDisplay(x.housing.internet)],
+      ["기타 월 주거비",x=>costDisplay(x.housing.otherMonthly)]
+    ]},
+    {title:"초기 비용",rows:[
+      ["중개보수",x=>costDisplay(x.housing.brokerageFee)],
+      ["이사비",x=>costDisplay(x.housing.movingFee)],
+      ["입주 청소비",x=>costDisplay(x.housing.cleaningFee)],
+      ["기타 초기 비용",x=>costDisplay(x.housing.otherInitial)]
+    ]},
+    {title:"계산 결과",rows:[
+      ["초기 필요 자금",x=>(x.results.initialUnknown?"최소 ":"")+money(x.results.initialKnown)],
+      ["초기 비용 후 잔액",x=>(x.results.initialUnknown?"최대 ":"")+money(x.results.initialBalance)],
+      ["최소 보유 자금 대비",x=>(x.results.minDiff>=0?"+":"-")+money(Math.abs(x.results.minDiff))],
+      ["월 주거비",x=>(x.results.monthlyUnknown?"최소 ":"")+money(x.results.monthlyKnown)],
+      ["주거비 반영 후 잔액",x=>(x.results.monthlyUnknown?"최대 ":"")+money(x.results.monthlyBalance)]
+    ]}
   ];
-  let body='<h2>비교</h2><p class="muted">초기 부담과 매달 부담의 차이를 함께 확인하세요.</p><section class="section"><div class="table-wrap"><table><thead><tr><th>항목</th>'+chosen.map(x=>'<th>'+escapeHtml(x.name)+'</th>').join("")+'</tr></thead><tbody>';
-  body+=rows.map(([l,fn])=>'<tr><td>'+l+'</td>'+chosen.map(x=>'<td>'+fn(x)+'</td>').join("")+'</tr>').join("")+'</tbody></table></div></section>';
+  let body='<h2>비교</h2><p class="muted">초기 부담과 매달 부담의 차이를 함께 확인하세요.</p>';
+  body+='<div class="compare-desktop"><section class="section"><div class="table-wrap"><table><thead><tr><th>항목</th>'+chosen.map(x=>'<th>'+escapeHtml(x.name)+'</th>').join("")+'</tr></thead><tbody>';
+  groups.forEach(group=>{
+    body+='<tr class="group-row"><td colspan="'+(chosen.length+1)+'">'+group.title+'</td></tr>';
+    body+=group.rows.map(([label,fn])=>'<tr><td>'+label+'</td>'+chosen.map(x=>'<td>'+fn(x)+'</td>').join("")+'</tr>').join("");
+  });
+  body+='</tbody></table></div></section></div>';
+  body+='<div class="compare-mobile">';
+  groups.forEach(group=>{
+    body+='<section class="compare-section"><h3>'+group.title+'</h3>';
+    group.rows.forEach(([label,fn])=>{
+      body+='<div class="compare-metric"><div class="compare-metric-label">'+label+'</div><div class="compare-values">'+chosen.map(x=>'<div class="compare-value"><span>'+escapeHtml(x.name)+'</span><strong>'+fn(x)+'</strong></div>').join("")+'</div></div>';
+    });
+    body+='</section>';
+  });
+  body+='</div>';
   body+='<section class="section"><h3>AI 비교 해석</h3><p class="muted">조건 간 비용 구조와 주요 차이만 짧게 정리합니다.</p>';
   if(state.aiResult){
     body+='<div class="ai-box">'+(state.aiResult.keyDifferences?'<div class="ai-section"><h3>핵심 차이</h3><p>'+escapeHtml(state.aiResult.keyDifferences)+'</p></div>':'')+(state.aiResult.costStructure?'<div class="ai-section"><h3>비용 구조</h3><p>'+escapeHtml(state.aiResult.costStructure)+'</p></div>':'')+(state.aiResult.mainVariables?'<div class="ai-section"><h3>주요 변수</h3><p>'+escapeHtml(state.aiResult.mainVariables)+'</p></div>':'')+(state.aiResult.summary?'<p>'+escapeHtml(state.aiResult.summary)+'</p>':'')+'</div>'
@@ -136,11 +203,13 @@ function bind(){
   document.querySelectorAll("[data-cost-amount]").forEach(i=>i.oninput=e=>{const k=i.dataset.costAmount;state.housing[k].amount=sanitize(e.target.value);e.target.value=formatInput(state.housing[k].amount)});
   $("[data-calc]")?.addEventListener("click",()=>{const e=validateHousing();document.querySelectorAll("[data-error]").forEach(x=>x.textContent=e[x.dataset.error]||"");if(Object.keys(e).length)return;state.lastResult=calculate(state.finance,state.housing);state.view="result";render()});
   $("[data-save]")?.addEventListener("click",()=>{const item=snapshot(),a=list(),i=a.findIndex(x=>x.id===item.id);if(i>=0)a[i]=item;else a.unshift(item);saveList(a);state.editingId=item.id;render()});
+  $("[data-export-current]")?.addEventListener("click",()=>exportConditionImage({name:state.housing.name.trim(),transactionType:state.housing.transactionType,housing:structuredClone(state.housing),financeSnapshot:structuredClone(state.finance),results:calculate(state.finance,state.housing)}));
   $("[data-edit-housing]")?.addEventListener("click",()=>{state.view="housing";render()});
   document.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>{state.housing=newHousing();state.editingId=null;state.lastResult=null;state.view="housing";render()});
   document.querySelectorAll("[data-select]").forEach(i=>i.onchange=e=>{const id=i.dataset.select;if(e.target.checked&&!state.selected.includes(id)){if(state.selected.length>=3){alert("비교는 최대 3개까지 가능해요.");return render()}state.selected.push(id)}else state.selected=state.selected.filter(x=>x!==id);render()});
   document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openCalc(b.dataset.open,false));
   document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openCalc(b.dataset.edit,true));
+  document.querySelectorAll("[data-export]").forEach(b=>b.onclick=()=>{const x=list().find(v=>v.id===b.dataset.export);if(x)exportConditionImage(x)});
   document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>{saveList(list().filter(x=>x.id!==b.dataset.delete));state.selected=state.selected.filter(x=>x!==b.dataset.delete);render()});
   $("[data-compare]")?.addEventListener("click",()=>{state.view="compare";state.aiResult=null;render()});
   $("[data-ai]")?.addEventListener("click",askAI)
