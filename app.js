@@ -11,7 +11,7 @@ const saveList=v=>save(KEY.calculations,v);
 let state={
   view:"home",
   finance:load(KEY.finance)||{availableFunds:"",monthlyIncome:"",fixedExpenses:"",minimumFunds:""},
-  housing:newHousing(),editingId:null,lastResult:null,selected:[],aiResult:null,isDirty:false
+  housing:newHousing(),editingId:null,lastResult:null,selected:[],aiResult:null,isDirty:false,selectedMinPct:null
 };
 
 function row(label,val){return '<div class="row"><span>'+label+'</span><strong>'+val+'</strong></div>'}
@@ -108,8 +108,10 @@ function finance(){
   field("availableFunds","가용 자금","독립을 위해 실제로 사용할 수 있는 현금성 자금을 입력하세요.")+
   field("monthlyIncome","월 소득","수입이 일정하지 않다면 최근 1년간 평균 월 소득을 입력하세요.")+
   field("fixedExpenses","월 고정지출","독립 후에도 계속 발생하는 대출 상환·보험료·통신비·정기 구독료 등을 합산해 입력하세요.")+
-  field("minimumFunds","최소 보유 자금","독립 비용을 지출한 뒤에도 최소한 남겨두고 싶은 자금을 입력하세요.")+
-  '<div class="quick-set"><div class="helper">가용 자금 중 최소한 남겨둘 비율을 빠르게 설정할 수 있어요.</div><div class="quick-set-buttons"><button type="button" data-min-pct="25">25% 남기기</button><button type="button" data-min-pct="50">50% 남기기</button><button type="button" data-min-pct="75">75% 남기기</button></div></div>'+
+  '<div class="field reserve-field"><label>최소 보유 자금</label><div class="helper">독립 비용을 지출한 뒤에도 최소한 남겨두고 싶은 자금을 입력하세요.</div>'+
+    '<div class="quick-set-buttons"><button type="button" data-min-pct="25" class="'+(state.selectedMinPct===25?"active":"")+'">25% 남기기</button><button type="button" data-min-pct="50" class="'+(state.selectedMinPct===50?"active":"")+'">50% 남기기</button><button type="button" data-min-pct="75" class="'+(state.selectedMinPct===75?"active":"")+'">75% 남기기</button></div>'+
+    '<div class="input-wrap"><input inputmode="numeric" data-finance="minimumFunds" value="'+formatInput(state.finance.minimumFunds)+'" placeholder="0"><span>원</span></div>'+
+    '<div class="error" data-error="minimumFunds"></div></div>'+
   '</section><div class="actions"><button class="btn primary" data-next-finance>다음</button><button class="btn ghost" data-go="home">취소</button></div>'
 }
 function housing(){
@@ -257,7 +259,7 @@ function snapshot(){
   return {id:state.editingId||crypto.randomUUID(),name:state.housing.name.trim(),transactionType:state.housing.transactionType,housing:structuredClone(state.housing),financeSnapshot:structuredClone(state.finance),results:calculate(state.finance,state.housing),createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()}
 }
 function openCalc(id,edit){
-  const x=list().find(v=>v.id===id); if(!x)return; state.finance=structuredClone(x.financeSnapshot);state.housing=structuredClone(x.housing);state.lastResult=x.results;state.editingId=x.id;state.isDirty=edit;state.view=edit?"housing":"result";render()
+  const x=list().find(v=>v.id===id); if(!x)return; state.finance=structuredClone(x.financeSnapshot);state.housing=structuredClone(x.housing);state.lastResult=x.results;state.editingId=x.id;state.isDirty=edit;state.selectedMinPct=null;state.view=edit?"housing":"result";render()
 }
 async function askAI(){
   const chosen=list().filter(x=>state.selected.includes(x.id));
@@ -281,13 +283,20 @@ function render(){
 }
 function bind(){
   document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{state.view=b.dataset.go;state.aiResult=null;render()});
-  document.querySelectorAll("[data-start]").forEach(b=>b.onclick=()=>{state.view="finance";state.editingId=null;state.housing=newHousing();state.isDirty=false;render()});
-  document.querySelectorAll("[data-finance]").forEach(i=>i.oninput=e=>{state.finance[i.dataset.finance]=sanitize(e.target.value);state.isDirty=!!state.editingId;e.target.value=formatInput(state.finance[i.dataset.finance])});
+  document.querySelectorAll("[data-start]").forEach(b=>b.onclick=()=>{state.view="finance";state.editingId=null;state.housing=newHousing();state.isDirty=false;state.selectedMinPct=null;render()});
+  document.querySelectorAll("[data-finance]").forEach(i=>i.oninput=e=>{
+    const key=i.dataset.finance;
+    state.finance[key]=sanitize(e.target.value);
+    if(key==="minimumFunds"||key==="availableFunds") state.selectedMinPct=null;
+    state.isDirty=!!state.editingId;
+    e.target.value=formatInput(state.finance[key]);
+  });
   document.querySelectorAll("[data-min-pct]").forEach(b=>b.onclick=()=>{
     if(state.finance.availableFunds===""){
       const e=document.querySelector('[data-error="minimumFunds"]');if(e)e.textContent="가용 자금을 먼저 입력해주세요.";return;
     }
-    state.finance.minimumFunds=String(Math.round(num(state.finance.availableFunds)*Number(b.dataset.minPct)/100));
+    state.selectedMinPct=Number(b.dataset.minPct);
+    state.finance.minimumFunds=String(Math.round(num(state.finance.availableFunds)*state.selectedMinPct/100));
     state.isDirty=!!state.editingId;render();
   });
   $("[data-next-finance]")?.addEventListener("click",()=>{const e=validateFinance();document.querySelectorAll("[data-error]").forEach(x=>x.textContent=e[x.dataset.error]||"");if(Object.keys(e).length)return;save(KEY.finance,state.finance);state.view="housing";render()});
