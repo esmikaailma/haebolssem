@@ -24,69 +24,69 @@ function exportConditionImage(item){
   const r=item.results;
   const unknown=[...unknownLabels(item.housing,OPTIONAL_INITIAL),...unknownLabels(item.housing,OPTIONAL_MONTHLY)];
   const canvas=document.createElement("canvas");
-  canvas.width=1080;canvas.height=2100;
+  canvas.width=1080;canvas.height=2200;
   const ctx=canvas.getContext("2d");
   const left=104,right=976;
-  ctx.fillStyle="#f8fafc";ctx.fillRect(0,0,1080,2100);
-  ctx.fillStyle="#ffffff";ctx.fillRect(54,54,972,1992);
+  ctx.fillStyle="#f8fafc";ctx.fillRect(0,0,1080,2200);
+  ctx.fillStyle="#ffffff";ctx.fillRect(54,54,972,2092);
   const dash=y=>{ctx.strokeStyle="#cbd5e1";ctx.setLineDash([10,10]);ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(right,y);ctx.stroke();ctx.setLineDash([])};
-  const valueRow=(label,value,y,color="#111827")=>{
-    ctx.fillStyle="#6b7280";ctx.font="600 23px Pretendard, sans-serif";ctx.textAlign="left";ctx.fillText(label,left,y);
-    ctx.fillStyle=color;ctx.font="800 31px Pretendard, sans-serif";ctx.textAlign="right";ctx.fillText(value,right,y);ctx.textAlign="left";
-  };
   const wrapText=(text,x,y,maxWidth,lineHeight)=>{
     const words=String(text).split(" ");let line="";let cursor=y;
-    words.forEach(word=>{
-      const test=line?line+" "+word:word;
-      if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,cursor);line=word;cursor+=lineHeight}
-      else line=test;
-    });
-    if(line)ctx.fillText(line,x,cursor);
-    return cursor;
+    words.forEach(word=>{const test=line?line+" "+word:word;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,cursor);line=word;cursor+=lineHeight}else line=test});
+    if(line)ctx.fillText(line,x,cursor);return cursor;
   };
-  ctx.fillStyle="#2563eb";ctx.font="800 30px Pretendard, sans-serif";ctx.fillText("해볼셈",left,118);
-  ctx.fillStyle="#111827";ctx.font="800 48px Pretendard, sans-serif";ctx.fillText(item.name||"주거 조건",left,192);
-  ctx.fillStyle="#6b7280";ctx.font="500 25px Pretendard, sans-serif";ctx.fillText((item.transactionType==="monthlyRent"?"월세":"전세")+" · 독립 비용 계산 결과",left,236);
-  dash(286);
-  ctx.fillStyle="#111827";ctx.font="800 27px Pretendard, sans-serif";ctx.fillText("핵심 결과",left,334);
-  valueRow("초기 필요 자금",(r.initialUnknown?"최소 ":"")+money(r.initialKnown),390);
-  valueRow("초기 비용 후 잔액",(r.initialUnknown?"최대 ":"")+money(r.initialBalance),448);
-  valueRow("최소 보유 자금 대비",(r.minDiff>=0?"+":"-")+money(Math.abs(r.minDiff)),506,r.minDiff>=0?"#047857":"#b91c1c");
-  valueRow("월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown),564);
-  valueRow("주거비 반영 후 잔액",(r.monthlyUnknown?"최대 ":"")+money(r.monthlyBalance),622);
-  dash(670);
-  ctx.fillStyle="#111827";ctx.font="800 27px Pretendard, sans-serif";ctx.fillText("계산 내역",left,720);
-  let y=776;
-  const smallRow=(label,value)=>{
+  let y=118;
+  const sectionTitle=title=>{ctx.fillStyle="#111827";ctx.font="800 27px Pretendard, sans-serif";ctx.textAlign="left";ctx.fillText(title,left,y);y+=48};
+  const smallRow=(label,value,color="#111827")=>{
     ctx.fillStyle="#6b7280";ctx.font="500 22px Pretendard, sans-serif";ctx.textAlign="left";ctx.fillText(label,left,y);
-    ctx.fillStyle="#111827";ctx.font="650 22px Pretendard, sans-serif";ctx.textAlign="right";ctx.fillText(value,right,y);ctx.textAlign="left";y+=43;
+    ctx.fillStyle=color;ctx.font="700 22px Pretendard, sans-serif";ctx.textAlign="right";ctx.fillText(value,right,y);ctx.textAlign="left";y+=43;
   };
-  ctx.fillStyle="#374151";ctx.font="700 22px Pretendard, sans-serif";ctx.fillText("초기 비용",left,y);y+=42;
-  smallRow("보증금",money(num(item.housing.deposit)));
-  OPTIONAL_INITIAL.forEach(([k,label])=>smallRow(label,costDisplay(item.housing[k])));
-  y+=8;valueRow("초기 필요 자금",(r.initialUnknown?"최소 ":"")+money(r.initialKnown),y);y+=62;
-  ctx.fillStyle="#374151";ctx.font="700 22px Pretendard, sans-serif";ctx.fillText("월 주거비",left,y);y+=42;
-  if(item.transactionType==="monthlyRent") smallRow("월세",money(num(item.housing.monthlyRent)));
-  OPTIONAL_MONTHLY.forEach(([k,label])=>smallRow(label,costDisplay(item.housing[k])));
-  y+=8;valueRow("월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown),y);y+=70;
-  dash(y);y+=50;
-  ctx.fillStyle="#111827";ctx.font="800 27px Pretendard, sans-serif";ctx.fillText("재정 기준",left,y);y+=46;
+  const totalRow=(label,value,color="#111827")=>{
+    y+=5;ctx.strokeStyle="#e5e7eb";ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(right,y);ctx.stroke();y+=43;
+    ctx.fillStyle="#374151";ctx.font="700 23px Pretendard, sans-serif";ctx.textAlign="left";ctx.fillText(label,left,y);
+    ctx.fillStyle=color;ctx.font="800 30px Pretendard, sans-serif";ctx.textAlign="right";ctx.fillText(value,right,y);ctx.textAlign="left";y+=50;
+  };
+
+  ctx.fillStyle="#2563eb";ctx.font="800 30px Pretendard, sans-serif";ctx.fillText("해볼셈",left,y);y+=72;
+  ctx.fillStyle="#111827";ctx.font="800 48px Pretendard, sans-serif";ctx.fillText(item.name||"주거 조건",left,y);y+=44;
+  ctx.fillStyle="#6b7280";ctx.font="500 25px Pretendard, sans-serif";ctx.fillText((item.transactionType==="monthlyRent"?"월세":"전세")+" · 독립 비용 계산 결과",left,y);y+=52;
+  dash(y);y+=52;
+
+  sectionTitle("재정 기준");
   smallRow("가용 자금",money(num(item.financeSnapshot.availableFunds)));
   smallRow("월 소득",money(num(item.financeSnapshot.monthlyIncome)));
   smallRow("월 고정지출",money(num(item.financeSnapshot.fixedExpenses)));
   smallRow("최소 보유 자금",money(num(item.financeSnapshot.minimumFunds)));
+  y+=16;dash(y);y+=52;
+
+  sectionTitle("초기 비용 계산");
+  smallRow("보증금",money(num(item.housing.deposit)));
+  OPTIONAL_INITIAL.forEach(([k,label])=>smallRow(label,costDisplay(item.housing[k])));
+  totalRow("초기 필요 자금",(r.initialUnknown?"최소 ":"")+money(r.initialKnown));
+  smallRow("가용 자금 - 초기 필요 자금",(r.initialUnknown?"최대 ":"")+money(r.initialBalance));
+  smallRow("최소 보유 자금 대비",(r.minDiff>=0?"+":"-")+money(Math.abs(r.minDiff)),r.minDiff>=0?"#047857":"#b91c1c");
+  y+=16;dash(y);y+=52;
+
+  sectionTitle("월 주거비 계산");
+  if(item.transactionType==="monthlyRent") smallRow("월세",money(num(item.housing.monthlyRent)));
+  OPTIONAL_MONTHLY.forEach(([k,label])=>smallRow(label,costDisplay(item.housing[k])));
+  totalRow("월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown));
+  smallRow("월 소득 - 월 고정지출 - 월 주거비",(r.monthlyUnknown?"최대 ":"")+money(r.monthlyBalance));
+  y+=16;
+
   if(unknown.length){
-    y+=18;dash(y);y+=48;
-    ctx.fillStyle="#9a3412";ctx.font="800 24px Pretendard, sans-serif";ctx.fillText("미확인 비용",left,y);y+=42;
-    ctx.font="600 21px Pretendard, sans-serif";
+    dash(y);y+=52;sectionTitle("미확인 비용");
+    ctx.fillStyle="#9a3412";ctx.font="600 21px Pretendard, sans-serif";
     unknown.forEach(label=>{ctx.fillText("• "+label,left,y);y+=34});
     ctx.fillStyle="#7c2d12";ctx.font="500 19px Pretendard, sans-serif";
     y=wrapText("미확인 비용은 0원으로 처리하지 않고 합계에서 제외했어요. 비용 합계는 최소값, 잔액은 최대값으로 표시됩니다.",left,y+8,right-left,29)+35;
   }
-  dash(y);y+=48;
+
+  dash(Math.min(y+16,2040));
   ctx.fillStyle="#6b7280";ctx.font="500 19px Pretendard, sans-serif";
-  y=wrapText("주거비 반영 후 잔액에는 식비·교통비 등 변동 생활비가 포함되지 않습니다.",left,y,right-left,28);
-  ctx.fillStyle="#94a3b8";ctx.font="500 18px Pretendard, sans-serif";ctx.fillText("해볼셈 · 계산 결과",left,1990);
+  wrapText("주거비 반영 후 잔액에는 식비·교통비 등 변동 생활비가 포함되지 않습니다.",left,2070,right-left,28);
+  ctx.fillStyle="#94a3b8";ctx.font="500 18px Pretendard, sans-serif";ctx.fillText("해볼셈 · 계산 결과",left,2130);
+
   const a=document.createElement("a");a.download=(item.name||"해볼셈")+"-계산결과.png";a.href=canvas.toDataURL("image/png");a.click();
 }
 function field(k,label,helper){
@@ -131,7 +131,7 @@ function housing(){
   costControl("movingFee","이사비","")+
   costControl("cleaningFee","입주 청소비","")+
   costControl("otherInitial","기타 초기 비용","가구·가전·생활용품·설치비 등 추가 입주 준비 비용을 포함하세요.")+
-  '</section><div class="actions"><button class="btn primary" data-calc>계산하기</button><button class="btn secondary" data-go="finance">내 재정 변경</button></div>'
+  '</section><div class="actions"><button class="btn primary" data-calc>계산하기</button><button class="btn secondary" data-go="finance">재정 기준 수정</button></div>'
 }
 function result(){
   const r=state.lastResult||calculate(state.finance,state.housing);
@@ -170,9 +170,9 @@ function result(){
   if(saved){
     body+='<div class="saved-status">✓ 저장됨</div><div class="actions">'+
       (savedCount>=2?'<button class="btn primary" data-go-compare>저장한 조건 비교하기</button>':'<button class="btn primary" data-new>다른 조건 추가해 비교하기</button>')+
-      '<button class="btn secondary" data-export-current>결과 이미지로 저장</button><button class="btn secondary" data-edit-housing>주거 조건 변경</button><button class="btn secondary" data-go="finance">내 재정 변경</button><button class="btn ghost" data-go="saved">저장 내역 보기</button></div>';
+      '<button class="btn secondary" data-export-current>결과 이미지로 저장</button><button class="btn secondary" data-edit-housing>주거 조건 수정</button><button class="btn secondary" data-go="finance">재정 기준 수정</button>'+(savedCount>=2?'<button class="btn ghost" data-new>다른 조건 계산</button>':'')+'</div>';
   }else{
-    body+='<div class="compare-hint">이 결과를 저장하면 다른 주거 조건과 비교할 수 있어요.</div><div class="actions"><button class="btn primary" data-save>'+saveLabel+'</button><button class="btn secondary" data-export-current>결과 이미지로 저장</button><button class="btn secondary" data-edit-housing>주거 조건 변경</button><button class="btn secondary" data-go="finance">내 재정 변경</button><button class="btn ghost" data-new>다른 조건 계산</button><button class="btn ghost" data-go="saved">저장 내역 보기</button></div>';
+    body+='<div class="compare-hint">이 결과를 저장하면 다른 주거 조건과 비교할 수 있어요.</div><div class="actions"><button class="btn primary" data-save>'+saveLabel+'</button><button class="btn secondary" data-export-current>결과 이미지로 저장</button><button class="btn secondary" data-edit-housing>주거 조건 수정</button><button class="btn secondary" data-go="finance">재정 기준 수정</button><button class="btn ghost" data-new>다른 조건 계산</button></div>';
   }
   return body
 }
@@ -183,7 +183,7 @@ function saved(){
     const r=x.results;
     return '<div class="card saved-card"><div class="saved-head"><div><h3>'+escapeHtml(x.name)+'</h3><div class="muted">'+(x.transactionType==="monthlyRent"?"월세":"전세")+'</div></div><input class="check" type="checkbox" data-select="'+x.id+'" '+(state.selected.includes(x.id)?"checked":"")+'></div>'+
     row("초기 필요 자금",(r.initialUnknown?"최소 ":"")+money(r.initialKnown))+row("초기 비용 후 잔액",(r.initialUnknown?"최대 ":"")+money(r.initialBalance))+row("월 주거비",(r.monthlyUnknown?"최소 ":"")+money(r.monthlyKnown))+row("주거비 반영 후 잔액",(r.monthlyUnknown?"최대 ":"")+money(r.monthlyBalance))+
-    '<div class="actions"><button class="btn secondary" data-open="'+x.id+'">결과 보기</button><button class="btn secondary" data-export="'+x.id+'">이미지 저장</button><button class="btn ghost" data-edit="'+x.id+'">주거 조건 변경</button><button class="btn ghost" data-delete="'+x.id+'">삭제</button></div></div>'
+    '<div class="actions"><button class="btn secondary" data-open="'+x.id+'">결과 보기</button><button class="btn secondary" data-export="'+x.id+'">이미지 저장</button><button class="btn ghost" data-edit="'+x.id+'">주거 조건 수정</button><button class="btn ghost" data-delete="'+x.id+'">삭제</button></div></div>'
   }).join("")+'</div><div class="actions"><button class="btn primary" data-compare '+(state.selected.length<2?"disabled":"")+'>선택한 조건 비교 ('+state.selected.length+')</button><button class="btn secondary" data-new>다른 조건 계산</button></div>'
 }
 function compare(){
