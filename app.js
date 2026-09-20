@@ -269,7 +269,11 @@ async function askAI(){
   const b=$("[data-ai]"); if(b){b.disabled=true;b.textContent="내 재정 기준으로 정리하는 중..."}
   try{
     const r=await fetch("/api/compare",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scenarios:chosen})});
-    const d=await r.json();
+    const raw=await r.text();
+    let d;
+    try{d=JSON.parse(raw)}catch{
+      throw new Error(r.ok?"AI 응답 형식을 읽지 못했어요. 잠시 후 다시 시도해주세요.":"AI 서버에서 일시적인 오류가 발생했어요. 잠시 후 다시 시도해주세요.");
+    }
     if(!r.ok) throw new Error(d.error||"재정 기준 비교를 불러오지 못했습니다.");
     state.aiResult=d;
     const cache=load(KEY.ai)||{};cache[cacheKey]=d;save(KEY.ai,cache);
