@@ -75,13 +75,13 @@ export default async function handler(req,res){
       "monthlyBalanceAfterHousing는 식비·교통비 등 변동 생활비를 제외한 값이므로 생활 가능 금액이라고 표현하지 마세요.",
       "unknownItems가 있으면 해당 비용이 비교에 완전히 반영되지 않았다고 알려주세요.",
       "한국어로 아래 JSON만 반환하세요.",
-      '{"basis":"재정 기준을 1문장으로 설명","conditions":[{"name":"조건명","interpretation":"초기 부담과 월 부담을 재정 기준에 연결해 1~2문장"}],"tradeoff":"조건들 사이의 주요 비용 구조 차이를 1~2문장","checkPoints":["확인할 점 최대 2개"]}',
+      '{"basis":"재정 기준 1문장","conditions":[{"name":"조건명","interpretation":"초기 부담과 월 부담 1문장"}],"tradeoff":"주요 비용 구조 차이 1문장","checkPoints":["확인할 점 최대 2개"]}',
       "deterministicFacts:",
       JSON.stringify(deterministic)
     ].join("\n");
 
     const controller=new AbortController();
-    const timeout=setTimeout(()=>controller.abort(),18000);
+    const timeout=setTimeout(()=>controller.abort(),12000);
     let gatewayResponse;
     try{
       gatewayResponse=await fetch("https://ai-gateway.vercel.sh/v1/chat/completions",{
@@ -93,8 +93,9 @@ export default async function handler(req,res){
         body:JSON.stringify({
           model:"alibaba/qwen3.5-flash",
           messages:[{role:"user",content:prompt}],
-          max_tokens:320,
-          temperature:0.2
+          max_tokens:220,
+          temperature:0.1,
+          reasoning:{effort:"none"}
         }),
         signal:controller.signal
       });
