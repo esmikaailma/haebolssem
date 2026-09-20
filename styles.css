@@ -136,3 +136,38 @@ thead th{background:#f8fafc;font-size:13px}
   .compare-desktop{display:none}
   .compare-mobile{display:block}
 }
+
+.ai-input-helper{
+  background:#fff;
+}
+.ai-helper-head{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:flex-start;
+  margin-bottom:12px;
+}
+.optional-badge{
+  flex:none;
+  font-size:12px;
+  color:var(--muted);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:4px 8px;
+}
+textarea{
+  width:100%;
+  min-height:112px;
+  resize:vertical;
+  padding:14px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  font:inherit;
+  line-height:1.5;
+  background:#fff;
+}
+textarea:focus{
+  outline:2px solid rgba(37,99,235,.14);
+  border-color:var(--primary);
+}
+.actions.compact{margin-top:10px}
