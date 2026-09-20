@@ -28,6 +28,7 @@ function gatewayError(status,text){
 }
 
 export default async function handler(req,res){
+  res.setHeader("Cache-Control","no-store, no-cache, must-revalidate");
   if(req.method!=="POST") return res.status(405).json({error:"Method not allowed"});
   try{
     const apiKey=process.env.AI_GATEWAY_API_KEY;
@@ -93,11 +94,11 @@ export default async function handler(req,res){
           "Content-Type":"application/json"
         },
         body:JSON.stringify({
-          model:"alibaba/qwen3.5-flash",
+          model:"google/gemini-3.5-flash-lite",
+          models:["alibaba/qwen3.5-flash"],
           messages:[{role:"user",content:prompt}],
           max_tokens:220,
-          temperature:0.1,
-          reasoning:{effort:"none"}
+          temperature:0.1
         }),
         signal:controller.signal
       });
